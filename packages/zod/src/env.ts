@@ -1,0 +1,28 @@
+import { z } from "zod";
+
+export const GatewayEnvSchema = z.object({
+    PORT: z.string().default("8000"),
+    FRONTEND_URL: z.string().url(),
+    AUTH_SERVICE: z.string().url(),
+    PROJECT_SERVICE: z.string().url(),
+    FILE_SERVICE: z.string().url(),
+    REDIS_URL: z.string().url(),
+});
+
+export const AuthServiceEnvSchema = z.object({
+    PORT: z.string().default("8001"),
+    MONGODB_URI: z.string().url(),
+    REDIS_URL: z.string().url(),
+});
+
+export const ProjectServiceEnvSchema = z.object({
+    PORT: z.string().default("8002"),
+    MONGODB_URI: z.string().url(),
+    REDIS_URL: z.string().url(),
+});
+
+export const FileServiceEnvSchema = z.object({
+    PORT: z.string().default("8003"),
+    MONGODB_URI: z.string().url(),
+    REDIS_URL: z.string().url(),
+});
