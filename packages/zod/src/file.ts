@@ -18,6 +18,10 @@ export const FileSchema = z.object({
 
 export type File = z.infer<typeof FileSchema>;
 
+export interface FileTreeNode extends File {
+    children: FileTreeNode[];
+}
+
 export const FilesSchema = z.array(FileSchema);
 
 export const CreateRootFolderSchema = z.object({
@@ -30,16 +34,20 @@ export const CreateFolderSchema = z.object({
     parentId: z.string().min(1, "Parent ID is required"),
     name: z.string().min(1, "Folder name is required"),
 });
+export type CreateRootFolder = z.infer<typeof CreateRootFolderSchema>;
+export type CreateFolder = z.infer<typeof CreateFolderSchema>;
 
 export const CreateFileSchema = z.object({
     projectId: z.string().min(1, "Project ID is required"),
     parentId: z.string().min(1, "Parent ID is required"),
     name: z.string().min(1, "File name is required"),
-    content: z.string().default(""),
-    language: z.string().default("plainText"),
+    content: z.string().default("").optional(),
+    language: z.string().default("plainText").optional(),
 });
+export type CreateFile = z.infer<typeof CreateFileSchema>;
 
 export const UpdateFileSchema = z.object({
     name: z.string().min(1, "File name is required"),
-    content: z.string().min(1, "Content is required"),
+    content: z.string().optional(),
 });
+export type UpdateFile = z.infer<typeof UpdateFileSchema>;

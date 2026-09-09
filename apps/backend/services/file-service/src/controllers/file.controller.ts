@@ -66,11 +66,41 @@ export const createFolder = async (req: Request, res: Response) => {
                 message: "Project ID and folder Name are required",
             });
         }
-        const { projectId, parentId, name } = parsed.data;
+        const { projectId, parentId } = parsed.data;
+        let { name } = parsed.data;
+
+        // Support nested paths like "utils/v1"
+        let currentParentId = parentId;
+        if (name.includes("/")) {
+            const segments = name.split("/").filter(Boolean);
+            name = segments.pop()!; // last segment is the folder to create
+
+            for (const folderName of segments) {
+                let folder = await File.findOne({
+                    projectId,
+                    parentId: currentParentId,
+                    name: folderName,
+                    isDeleted: false,
+                    type: "folder",
+                });
+
+                if (!folder) {
+                    folder = await File.create({
+                        owner: userId,
+                        projectId,
+                        name: folderName,
+                        type: "folder",
+                        parentId: currentParentId,
+                    });
+                }
+
+                currentParentId = folder._id.toString();
+            }
+        }
 
         const exist = await File.findOne({
             projectId,
-            parentId,
+            parentId: currentParentId,
             name,
             isDeleted: false,
             type: "folder",
@@ -87,7 +117,7 @@ export const createFolder = async (req: Request, res: Response) => {
             projectId,
             name,
             type: "folder",
-            parentId,
+            parentId: currentParentId,
         });
 
         return res.status(201).json(FileSchema.parse(folder));
@@ -111,11 +141,41 @@ export const createFile = async (req: Request, res: Response) => {
                 message: "Project ID and File Name are required",
             });
         }
-        const { projectId, parentId, name, content, language } = parsed.data;
+        const { projectId, parentId, content, language } = parsed.data;
+        let { name } = parsed.data;
+
+        // Support nested paths like "utils/helper.ts"
+        let currentParentId = parentId || null;
+        if (name.includes("/")) {
+            const segments = name.split("/").filter(Boolean);
+            name = segments.pop()!; // last segment is the file name
+
+            for (const folderName of segments) {
+                let folder = await File.findOne({
+                    projectId,
+                    parentId: currentParentId,
+                    name: folderName,
+                    isDeleted: false,
+                    type: "folder",
+                });
+
+                if (!folder) {
+                    folder = await File.create({
+                        owner: userId,
+                        projectId,
+                        name: folderName,
+                        type: "folder",
+                        parentId: currentParentId,
+                    });
+                }
+
+                currentParentId = folder._id.toString();
+            }
+        }
 
         const exist = await File.findOne({
             projectId,
-            parentId,
+            parentId: currentParentId,
             name,
             isDeleted: false,
             type: "file",
@@ -134,11 +194,11 @@ export const createFile = async (req: Request, res: Response) => {
             projectId,
             name,
             type: "file",
-            parentId: parentId || null,
+            parentId: currentParentId,
             language,
             content,
             extension,
-            size: content.length,
+            size: content?.length,
         });
 
         return res.status(201).json(FileSchema.parse(file));
@@ -186,8 +246,10 @@ export const updateFile = async (req: Request, res: Response) => {
             : "";
         file.name = name;
         file.extension = extension;
-        file.content = content;
-        file.size = content.length;
+        if (content) {
+            file.content = content;
+            file.size = content.length;
+        }
 
         await file.save();
 
@@ -197,6 +259,19 @@ export const updateFile = async (req: Request, res: Response) => {
             message: `Internal Server Error: ${error}`,
         });
     }
+};
+
+const getDescendantIds = async (parentId: string): Promise<string[]> => {
+    const children = await File.find({ parentId, isDeleted: false });
+    const ids: string[] = [];
+    for (const child of children) {
+        ids.push(child._id.toString());
+        if (child.type === "folder") {
+            const nested = await getDescendantIds(child._id.toString());
+            ids.push(...nested);
+        }
+    }
+    return ids;
 };
 
 export const deleteFile = async (req: Request, res: Response) => {
@@ -221,6 +296,17 @@ export const deleteFile = async (req: Request, res: Response) => {
             return res.status(404).json({
                 message: "File not found",
             });
+        }
+
+        // Recursively soft-delete all descendants if this is a folder
+        if (file.type === "folder") {
+            const descendantIds = await getDescendantIds(paramsParsed.data.id);
+            if (descendantIds.length > 0) {
+                await File.updateMany(
+                    { _id: { $in: descendantIds } },
+                    { isDeleted: true },
+                );
+            }
         }
 
         return res.status(201).json(FileSchema.parse(file));

@@ -17,6 +17,6 @@ router.post("/create-file", createFile);
 router.post("/update/:id", updateFile);
 router.delete("/:id", deleteFile);
 router.get("/:id", getFile);
-router.get("/tree/:projectId", getTree);
+router.get("/tree/:id", getTree);
 
 export default router;

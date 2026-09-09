@@ -3,10 +3,12 @@ import type { Project } from "@bratCode/zod";
 
 interface ProjectState {
     projects: Project[];
+    currentProject: Project | null;
 }
 
 const initialState: ProjectState = {
     projects: [],
+    currentProject: null,
 };
 
 const projectSlice = createSlice({
@@ -15,6 +17,9 @@ const projectSlice = createSlice({
     reducers: {
         setProjects: (state, action: PayloadAction<Project[]>) => {
             state.projects = action.payload;
+        },
+        setCurrentProject: (state, action: PayloadAction<Project | null>) => {
+            state.currentProject = action.payload;
         },
         addNewProject: (state, action: PayloadAction<Project>) => {
             state.projects.unshift(action.payload);
@@ -35,7 +40,7 @@ const projectSlice = createSlice({
     },
 });
 
-export const { setProjects, addNewProject, starProject, setDeleteProject } =
+export const { setProjects, setCurrentProject, addNewProject, starProject, setDeleteProject } =
     projectSlice.actions;
 
 export default projectSlice.reducer;

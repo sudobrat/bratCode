@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { deleteProject, toggleStar } from "../features/project";
 import {
+    setCurrentProject,
     setDeleteProject,
     starProject,
-    type Project,
 } from "../redux/projectSlice";
 import { motion } from "motion/react";
 import { Star, Trash2 } from "lucide-react";
 import { useDispatch } from "react-redux";
+import { Project } from "@bratCode/zod";
+import { useNavigate } from "react-router-dom";
 
 function ProjectCard({ project }: { project: Project }) {
     const [loadingStar, setLoadingStar] = useState(false);
@@ -15,6 +17,7 @@ function ProjectCard({ project }: { project: Project }) {
     const [confirmDelete, setConfirmDelete] = useState(false);
 
     const dispatch = useDispatch();
+    const navigate = useNavigate();
 
     const handleToggleStar = async () => {
         if (!project._id) return;
@@ -53,14 +56,18 @@ function ProjectCard({ project }: { project: Project }) {
                 duration: 0.18,
                 ease: "easeOut",
             }}
+            onClick={() => {
+                navigate(`/project/${project._id}`);
+            }}
             className="group relative cursor-pointer rounded-2xl border border-black/6 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] dark:border-white/7 dark:bg-white/3 dark:shadow-none dark:hover:border-white/14 dark:hover:bg-white/4.5"
         >
             <motion.div
                 whileTap={{
                     scale: 0.9,
                 }}
-                onClick={() => {
+                onClick={(e) => {
                     if (loadingStar) return;
+                    e.stopPropagation();
                     handleToggleStar();
                 }}
                 className={`absolute right-4 top-4 rounded-md p-1 transition-opacity hover:text-amber-400 ${project.starred ? "opacity-100 text-amber-400" : "opacity-0 text-zinc-300 group-hover:opacity-100 dark:text-zinc-600"} ${loadingStar ? "cursor-wait opacity-60" : ""}`}
@@ -94,13 +101,21 @@ function ProjectCard({ project }: { project: Project }) {
                         className="flex items-center gap-2"
                     >
                         <button
-                            onClick={() => setConfirmDelete(false)}
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDelete(false);
+                            }}
                             className="cursor-pointer rounded-md px-2 py-1 text-[11px] text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
                         >
                             Cancel
                         </button>
                         <button
-                            onClick={handleDelete}
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete();
+                            }}
                             disabled={loadingDelete}
                             className="cursor-pointer rounded-md bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-500 hover:bg-red-500/20 dark:text-red-400 disabled:cursor-wait disabled:opacity-50"
                         >
@@ -108,7 +123,8 @@ function ProjectCard({ project }: { project: Project }) {
                         </button>
                     </motion.div>
                 ) : (
-                    <motion.div
+                    <motion.button
+                        type="button"
                         initial={{
                             opacity: 0,
                         }}
@@ -121,13 +137,14 @@ function ProjectCard({ project }: { project: Project }) {
                         whileTap={{
                             scale: 0.92,
                         }}
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.stopPropagation();
                             setConfirmDelete(true);
                         }}
-                        className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] text-zinc-300 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100 dark:text-zinc-600 dark:hover:text-red-400"
+                        className="cursor-pointer flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] text-zinc-300 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100 dark:text-zinc-600 dark:hover:text-red-400"
                     >
                         <Trash2 size={13} />
-                    </motion.div>
+                    </motion.button>
                 )}
             </div>
         </motion.div>
