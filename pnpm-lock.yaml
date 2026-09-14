@@ -402,6 +402,52 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  apps/backend/services/payment-service:
+    dependencies:
+      '@bratCode/logger':
+        specifier: workspace:*
+        version: link:../../../../packages/logger
+      '@bratCode/redis':
+        specifier: workspace:*
+        version: link:../../../../packages/redis
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      express:
+        specifier: 4.21.2
+        version: 4.21.2(supports-color@7.2.0)
+      mongoose:
+        specifier: ^9.9.4
+        version: 9.9.5
+    devDependencies:
+      '@bratCode/eslint':
+        specifier: workspace:*
+        version: link:../../../../packages/config-eslint
+      '@bratCode/typescript':
+        specifier: workspace:*
+        version: link:../../../../packages/config-typescript
+      '@bratCode/zod':
+        specifier: workspace:^
+        version: link:../../../../packages/zod
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.0
+        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      tsdown:
+        specifier: 0.12.0
+        version: 0.12.0(supports-color@7.2.0)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.19.4
+        version: 4.23.13
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   apps/backend/services/project-service:
     dependencies:
       '@bratCode/logger':
@@ -438,6 +484,52 @@ importers:
       eslint:
         specifier: ^9.39.0
         version: 9.39.5(supports-color@7.2.0)
+      tsdown:
+        specifier: 0.12.0
+        version: 0.12.0(supports-color@7.2.0)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.19.4
+        version: 4.23.13
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  apps/backend/services/terminal-service:
+    dependencies:
+      '@bratCode/logger':
+        specifier: workspace:*
+        version: link:../../../../packages/logger
+      '@bratCode/redis':
+        specifier: workspace:*
+        version: link:../../../../packages/redis
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      express:
+        specifier: 4.21.2
+        version: 4.21.2(supports-color@7.2.0)
+      mongoose:
+        specifier: ^9.9.4
+        version: 9.9.5
+    devDependencies:
+      '@bratCode/eslint':
+        specifier: workspace:*
+        version: link:../../../../packages/config-eslint
+      '@bratCode/typescript':
+        specifier: workspace:*
+        version: link:../../../../packages/config-typescript
+      '@bratCode/zod':
+        specifier: workspace:^
+        version: link:../../../../packages/zod
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.0
+        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
       tsdown:
         specifier: 0.12.0
         version: 0.12.0(supports-color@7.2.0)(typescript@5.9.3)

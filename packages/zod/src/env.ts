@@ -7,6 +7,8 @@ export const GatewayEnvSchema = z.object({
     PROJECT_SERVICE: z.string().url(),
     FILE_SERVICE: z.string().url(),
     AI_SERVICE: z.string().url(),
+    TERMINAL_SERVICE: z.string().url(),
+    PAYMENT_SERVICE: z.string().url(),
     REDIS_URL: z.string().url(),
 });
 
@@ -33,4 +35,20 @@ export const AIServiceEnvSchema = z.object({
     FILE_SERVICE: z.string().url(),
     AI_SERVICE: z.string().url(),
     OPENROUTER_API_KEY: z.string(),
+});
+
+export const TerminalServiceEnvSchema = z.object({
+    PORT: z.string().default("8005"),
+    MONGODB_URI: z.string().url(),
+    FILE_SERVICE: z.string().url(),
+    REDIS_URL: z.string().url(),
+});
+
+export const PaymentServiceEnvSchema = z.object({
+    PORT: z.string().default("8006"),
+    MONGODB_URI: z.string().url(),
+    REDIS_URL: z.string().url(),
+    RAZORPAY_KEY_ID: z.string(),
+    RAZORPAY_KEY_SECRET: z.string(),
+    AUTH_SERVICE: z.string().url(),
 });
