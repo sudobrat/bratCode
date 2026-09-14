@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import File from "../models/file.model";
 import {
     CreateRootFolderSchema,
     CreateFolderSchema,
@@ -9,381 +8,276 @@ import {
     ProjectIdParamSchema,
 } from "@bratCode/zod";
 import { buildTree } from "../utils/buildTree";
+import { execCommandInPod, getProjectPod } from "../k8s";
+import path from "path";
+
+// Helper to encode and decode IDs that contain both project info and file paths
+const encodeId = (projectId: string, filePath: string) => `${projectId}:${filePath}`;
+
+const parseId = (id: string) => {
+    const splitIndex = id.indexOf(":");
+    if (splitIndex === -1) return { projectId: "", filePath: id };
+    return { projectId: id.substring(0, splitIndex), filePath: id.substring(splitIndex + 1) };
+};
+
+const createMockFile = (
+    projectId: string,
+    filePath: string,
+    name: string,
+    type: "file" | "folder",
+    parentPath: string | null,
+    content = ""
+) => {
+    return {
+        _id: encodeId(projectId, filePath),
+        owner: "system",
+        projectId,
+        parentId: parentPath ? encodeId(projectId, parentPath) : null,
+        name,
+        type,
+        extension: name.includes(".") ? name.split(".").pop() || "" : "",
+        language: "plainText",
+        content,
+        size: content.length,
+        isDeleted: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+};
 
 export const createRootFolder = async (req: Request, res: Response) => {
     try {
-        const userId = req.headers["x-user-id"] as string;
-        if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
         const parsed = CreateRootFolderSchema.safeParse(req.body);
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Project ID and Name are required",
-            });
-        }
+        if (!parsed.success) return res.status(400).json({ message: "Project ID and Name are required" });
         const { projectId, projectName } = parsed.data;
 
-        const existingRootFolder = await File.findOne({
-            projectId,
-            parentId: null,
-            type: "folder",
-            isDeleted: false,
-        });
-        if (existingRootFolder) {
-            return res
-                .status(400)
-                .json({ message: "Root folder already exists" });
-        }
+        // Ensure pod is spun up for this project
+        await getProjectPod(projectId, projectName);
 
-        const rootFolder = await File.create({
-            owner: userId,
-            projectId,
-            name: projectName,
-            type: "folder",
-            parentId: null,
-        });
-
+        // Root folder is just "." conceptually
+        const rootFolder = createMockFile(projectId, ".", projectName, "folder", null);
         return res.status(201).json(FileSchema.parse(rootFolder));
     } catch (error) {
-        return res.status(500).json({
-            message: `Internal Server Error: ${error}`,
-        });
+        return res.status(500).json({ message: `Internal Server Error: ${error}` });
     }
 };
 
 export const createFolder = async (req: Request, res: Response) => {
     try {
-        const userId = req.headers["x-user-id"] as string;
-        if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
         const parsed = CreateFolderSchema.safeParse(req.body);
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Project ID and folder Name are required",
-            });
-        }
-        const { projectId, parentId } = parsed.data;
-        let { name } = parsed.data;
+        if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
+        
+        const { projectId, parentId, name } = parsed.data;
+        const podName = await getProjectPod(projectId);
+        
+        const { filePath: parentPath } = parentId ? parseId(parentId) : { filePath: "." };
+        const dirPath = parentPath !== "." ? `${parentPath}/${name}` : `./${name}`;
+        
+        const { exitCode, stderr } = await execCommandInPod(podName, ["mkdir", "-p", dirPath]);
+        if (exitCode !== 0) return res.status(500).json({ message: `Failed to create folder: ${stderr}` });
 
-        // Support nested paths like "utils/v1"
-        let currentParentId = parentId;
-        if (name.includes("/")) {
-            const segments = name.split("/").filter(Boolean);
-            name = segments.pop()!; // last segment is the folder to create
-
-            for (const folderName of segments) {
-                let folder = await File.findOne({
-                    projectId,
-                    parentId: currentParentId,
-                    name: folderName,
-                    isDeleted: false,
-                    type: "folder",
-                });
-
-                if (!folder) {
-                    folder = await File.create({
-                        owner: userId,
-                        projectId,
-                        name: folderName,
-                        type: "folder",
-                        parentId: currentParentId,
-                    });
-                }
-
-                currentParentId = folder._id.toString();
-            }
-        }
-
-        const exist = await File.findOne({
-            projectId,
-            parentId: currentParentId,
-            name,
-            isDeleted: false,
-            type: "folder",
-        });
-
-        if (exist) {
-            return res.status(400).json({
-                message: "Folder with this name already exists",
-            });
-        }
-
-        const folder = await File.create({
-            owner: userId,
-            projectId,
-            name,
-            type: "folder",
-            parentId: currentParentId,
-        });
-
+        const folder = createMockFile(projectId, dirPath, name.split("/").pop() || name, "folder", parentPath);
         return res.status(201).json(FileSchema.parse(folder));
     } catch (error) {
-        return res.status(500).json({
-            message: `Internal Server Error: ${error}`,
-        });
+        return res.status(500).json({ message: `Internal Server Error: ${error}` });
     }
 };
 
 export const createFile = async (req: Request, res: Response) => {
     try {
-        const userId = req.headers["x-user-id"] as string;
-        if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
         const parsed = CreateFileSchema.safeParse(req.body);
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Project ID and File Name are required",
-            });
-        }
-        const { projectId, parentId, content, language } = parsed.data;
-        let { name } = parsed.data;
-
-        // Support nested paths like "utils/helper.ts"
-        let currentParentId = parentId || null;
-        if (name.includes("/")) {
-            const segments = name.split("/").filter(Boolean);
-            name = segments.pop()!; // last segment is the file name
-
-            for (const folderName of segments) {
-                let folder = await File.findOne({
-                    projectId,
-                    parentId: currentParentId,
-                    name: folderName,
-                    isDeleted: false,
-                    type: "folder",
-                });
-
-                if (!folder) {
-                    folder = await File.create({
-                        owner: userId,
-                        projectId,
-                        name: folderName,
-                        type: "folder",
-                        parentId: currentParentId,
-                    });
-                }
-
-                currentParentId = folder._id.toString();
-            }
+        if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
+        
+        const { projectId, parentId, name, content = "" } = parsed.data;
+        const podName = await getProjectPod(projectId);
+        
+        const { filePath: parentPath } = parseId(parentId);
+        const filePath = parentPath !== "." ? `${parentPath}/${name}` : `./${name}`;
+        
+        const dirPath = path.posix.dirname(filePath);
+        if (dirPath !== ".") {
+            await execCommandInPod(podName, ["mkdir", "-p", dirPath]);
         }
 
-        const exist = await File.findOne({
-            projectId,
-            parentId: currentParentId,
-            name,
-            isDeleted: false,
-            type: "file",
-        });
+        const { exitCode, stderr } = await execCommandInPod(podName, ["bash", "-c", `cat > "${filePath}"`], content);
+        if (exitCode !== 0) return res.status(500).json({ message: `Failed to create file: ${stderr}` });
 
-        if (exist) {
-            return res.status(400).json({
-                message: "File with this name already exists",
-            });
-        }
-
-        const extension = name?.includes(".") ? name?.split(".").pop() : "";
-
-        const file = await File.create({
-            owner: userId,
-            projectId,
-            name,
-            type: "file",
-            parentId: currentParentId,
-            language,
-            content,
-            extension,
-            size: content?.length,
-        });
-
+        const file = createMockFile(projectId, filePath, name.split("/").pop() || name, "file", parentPath, content);
         return res.status(201).json(FileSchema.parse(file));
     } catch (error) {
-        return res.status(500).json({
-            message: `Internal Server Error: ${error}`,
-        });
+        return res.status(500).json({ message: `Internal Server Error: ${error}` });
     }
 };
 
 export const updateFile = async (req: Request, res: Response) => {
     try {
-        const userId = req.headers["x-user-id"] as string;
-        if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
         const paramsParsed = ProjectIdParamSchema.safeParse(req.params);
-        if (!paramsParsed.success) {
-            return res.status(400).json({ message: "Invalid file ID" });
-        }
-
+        if (!paramsParsed.success) return res.status(400).json({ message: "Invalid file ID" });
+        
         const parsed = UpdateFileSchema.safeParse(req.body);
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "File name and content are required",
-            });
-        }
+        if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
+        
+        const { projectId, filePath } = parseId(paramsParsed.data.id);
         const { name, content } = parsed.data;
+        const podName = await getProjectPod(projectId);
 
-        const file = await File.findOne({
-            _id: paramsParsed.data.id,
-            isDeleted: false,
-            owner: userId,
-        });
-
-        if (!file) {
-            return res.status(404).json({
-                message: "File not found",
-            });
+        // If the name changed, we need to move it
+        const currentName = path.posix.basename(filePath);
+        let targetFilePath = filePath;
+        
+        if (name && name !== currentName) {
+            const dirPath = path.posix.dirname(filePath);
+            targetFilePath = dirPath !== "." ? `${dirPath}/${name}` : `./${name}`;
+            await execCommandInPod(podName, ["mv", filePath, targetFilePath]);
         }
 
-        const extension = name?.includes(".")
-            ? (name?.split(".").pop() ?? "")
-            : "";
-        file.name = name;
-        file.extension = extension;
-        if (content) {
-            file.content = content;
-            file.size = content.length;
+        if (content !== undefined) {
+            await execCommandInPod(podName, ["bash", "-c", `cat > "${targetFilePath}"`], content);
         }
 
-        await file.save();
-
+        const file = createMockFile(
+            projectId, 
+            targetFilePath, 
+            name || currentName, 
+            "file", 
+            path.posix.dirname(targetFilePath), 
+            content
+        );
         return res.status(201).json(FileSchema.parse(file));
     } catch (error) {
-        return res.status(500).json({
-            message: `Internal Server Error: ${error}`,
-        });
+        return res.status(500).json({ message: `Internal Server Error: ${error}` });
     }
-};
-
-const getDescendantIds = async (parentId: string): Promise<string[]> => {
-    const children = await File.find({ parentId, isDeleted: false });
-    const ids: string[] = [];
-    for (const child of children) {
-        ids.push(child._id.toString());
-        if (child.type === "folder") {
-            const nested = await getDescendantIds(child._id.toString());
-            ids.push(...nested);
-        }
-    }
-    return ids;
 };
 
 export const deleteFile = async (req: Request, res: Response) => {
     try {
-        const userId = req.headers["x-user-id"] as string;
-        if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
         const paramsParsed = ProjectIdParamSchema.safeParse(req.params);
-        if (!paramsParsed.success) {
-            return res.status(400).json({ message: "Invalid file ID" });
-        }
+        if (!paramsParsed.success) return res.status(400).json({ message: "Invalid file ID" });
+        
+        const { projectId, filePath } = parseId(paramsParsed.data.id);
+        const podName = await getProjectPod(projectId);
 
-        const file = await File.findByIdAndUpdate(
-            paramsParsed.data.id,
-            { isDeleted: true },
-            { new: true },
-        );
+        await execCommandInPod(podName, ["rm", "-rf", filePath]);
 
-        if (!file) {
-            return res.status(404).json({
-                message: "File not found",
-            });
-        }
-
-        // Recursively soft-delete all descendants if this is a folder
-        if (file.type === "folder") {
-            const descendantIds = await getDescendantIds(paramsParsed.data.id);
-            if (descendantIds.length > 0) {
-                await File.updateMany(
-                    { _id: { $in: descendantIds } },
-                    { isDeleted: true },
-                );
-            }
-        }
-
+        const file = createMockFile(projectId, filePath, path.posix.basename(filePath), "file", path.posix.dirname(filePath));
+        file.isDeleted = true;
+        
         return res.status(201).json(FileSchema.parse(file));
     } catch (error) {
-        return res.status(500).json({
-            message: `Internal Server Error: ${error}`,
-        });
+        return res.status(500).json({ message: `Internal Server Error: ${error}` });
     }
 };
 
 export const getFile = async (req: Request, res: Response) => {
     try {
-        const userId = req.headers["x-user-id"] as string;
-        if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
         const paramsParsed = ProjectIdParamSchema.safeParse(req.params);
-        if (!paramsParsed.success) {
-            return res.status(400).json({ message: "Invalid file ID" });
-        }
+        if (!paramsParsed.success) return res.status(400).json({ message: "Invalid file ID" });
+        
+        const { projectId, filePath } = parseId(paramsParsed.data.id);
+        const podName = await getProjectPod(projectId);
 
-        const file = await File.findOne({
-            _id: paramsParsed.data.id,
-            isDeleted: false,
-            owner: userId,
-        });
+        const { stdout: content, exitCode } = await execCommandInPod(podName, ["cat", filePath]);
+        if (exitCode !== 0) return res.status(404).json({ message: "File not found" });
 
-        if (!file) {
-            return res.status(404).json({
-                message: "File not found",
-            });
-        }
-
+        const file = createMockFile(projectId, filePath, path.posix.basename(filePath), "file", path.posix.dirname(filePath), content);
         return res.status(200).json(FileSchema.parse(file));
     } catch (error) {
-        return res.status(500).json({
-            message: `Internal Server Error: ${error}`,
-        });
+        return res.status(500).json({ message: `Internal Server Error: ${error}` });
     }
 };
 
 export const getTree = async (req: Request, res: Response) => {
     try {
-        const userId = req.headers["x-user-id"] as string;
-        if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
         const paramsParsed = ProjectIdParamSchema.safeParse(req.params);
-        if (!paramsParsed.success) {
-            return res.status(400).json({ message: "Invalid file ID" });
-        }
-
+        if (!paramsParsed.success) return res.status(400).json({ message: "Invalid project ID" });
+        
         const projectId = paramsParsed.data.id;
+        const podName = await getProjectPod(projectId);
 
-        const files = await File.find({
-            projectId,
+        // A tiny Node.js script executed inside the pod to walk the directory
+        // and return a JSON array of all files formatted like our mocked files!
+        const script = `
+        const fs = require('fs');
+        const path = require('path');
+        const crypto = require('crypto');
+
+        function walk(dir, parentPath) {
+            let results = [];
+            let files = [];
+            try {
+                files = fs.readdirSync(dir);
+            } catch (e) {
+                return results; // Directory might not exist yet
+            }
+            
+            for (const file of files) {
+                if (file === 'node_modules' || file === '.git' || file === '.npm') continue;
+                const filePath = dir === '.' ? './' + file : dir + '/' + file;
+                
+                let stats;
+                try {
+                    stats = fs.statSync(filePath);
+                } catch(e) {
+                    continue;
+                }
+                
+                const isDir = stats.isDirectory();
+                
+                results.push({
+                    _id: "${projectId}:" + filePath,
+                    owner: "system",
+                    projectId: "${projectId}",
+                    parentId: parentPath === null ? null : "${projectId}:" + parentPath,
+                    name: file,
+                    type: isDir ? 'folder' : 'file',
+                    extension: isDir ? '' : path.extname(file).replace('.', ''),
+                    language: 'plainText',
+                    content: '',
+                    size: stats.size,
+                    isDeleted: false,
+                    createdAt: stats.birthtime,
+                    updatedAt: stats.mtime,
+                });
+                
+                if (isDir) {
+                    results = results.concat(walk(filePath, filePath));
+                }
+            }
+            return results;
+        }
+        
+        const root = {
+            _id: "${projectId}:.",
+            owner: "system",
+            projectId: "${projectId}",
+            parentId: null,
+            name: "project",
+            type: "folder",
+            extension: "",
+            language: "plainText",
+            content: "",
+            size: 0,
             isDeleted: false,
-            owner: userId,
-        }).sort({
-            name: 1,
-            type: -1,
-        });
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+        
+        console.log(JSON.stringify([root, ...walk('.', '.')]));
+        `;
 
-        if (!files) {
-            return res.status(404).json({
-                message: "Files not found",
-            });
+        const { stdout, stderr, exitCode } = await execCommandInPod(podName, ["node", "-e", script]);
+        if (exitCode !== 0) return res.status(500).json({ message: `Tree fetch failed: ${stderr}` });
+
+        let files = [];
+        try {
+            files = JSON.parse(stdout);
+        } catch (e) {
+            return res.status(500).json({ message: "Failed to parse tree JSON" });
         }
 
         const tree = buildTree(FileSchema.array().parse(files));
-
         return res.status(200).json(tree);
     } catch (error) {
-        return res.status(500).json({
-            message: `Internal Server Error: ${error}`,
-        });
+        return res.status(500).json({ message: `Internal Server Error: ${error}` });
     }
 };

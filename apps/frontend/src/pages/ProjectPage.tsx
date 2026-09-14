@@ -299,7 +299,7 @@ function ProjectPage() {
                     <AnimatePresence>
                         {showTerminal && (
                             <div className="max-h-[45vh] md:max-h-none">
-                                <Terminal projectId={id} onClose={() => setShowTerminal(false)} />
+                                <Terminal projectId={id} onClose={() => setShowTerminal(false)} onFileChange={loadTree} />
                             </div>
                         )}
                     </AnimatePresence>

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ide-pvc
+  namespace: default
+spec:
+  # Note: For Azure this would typically be "azurefile-csi"
+  # For local docker-desktop testing, we can omit it or use the default (hostpath)
+  # storageClassName: default
+  accessModes:
+    # ReadWriteMany is ideal for cloud (Azure Files) so many pods can mount it.
+    # Docker Desktop default provisioner might only fully support ReadWriteOnce,
+    # but since it's hostpath, we can often get away with it, or we fall back.
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
