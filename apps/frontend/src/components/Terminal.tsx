@@ -1,7 +1,7 @@
 import { TerminalSquare, X } from "lucide-react";
 import { motion } from "motion/react";
 
-function Terminal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+function Terminal({ projectId: _projectId, onClose }: { projectId: string; onClose: () => void }) {
     return (
         <motion.div
             initial={{ height: 0, opacity: 0 }}

@@ -1,30 +1,33 @@
 import type { FileTreeNode } from "@bratCode/zod";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { motion } from "motion/react";
 
 function Preview({ tree }: { tree: FileTreeNode[] }) {
-    const srcDoc = useMemo(
-        (items = []) => {
-            let html = "";
-            let css = "";
-            let js = "";
+    const [refreshKey, setRefreshKey] = useState(0);
 
-            const walk = (items: FileTreeNode[]) => {
-                for (const item of items) {
-                    if (item.type === "file") {
-                        if (item.name == "index.html") html = item.content || "";
-                        if (item.name.endsWith("css")) css = item.content || "";
-                        if (item.name.endsWith("js")) js = item.content || "";
-                    }
-                    if (item.children?.length) {
-                        walk(item.children);
-                    }
+    const srcDoc = useMemo(() => {
+        let html = "";
+        let css = "";
+        let js = "";
+
+        const walk = (nodes: FileTreeNode[]) => {
+            for (const item of nodes) {
+                if (item.type === "file") {
+                    if (item.name === "index.html") html = item.content || "";
+                    if (item.name.endsWith(".css")) css += "\n" + (item.content || "");
+                    if (item.name.endsWith(".js")) js += "\n" + (item.content || "");
                 }
-            };
+                if (item.children?.length) {
+                    walk(item.children);
+                }
+            }
+        };
 
-            walk(tree);
+        walk(tree);
 
-            if (!html) {
-                return `
+        if (!html) {
+            return `
     <!DOCTYPE html>
     <html>
       <body style="
@@ -44,35 +47,45 @@ function Preview({ tree }: { tree: FileTreeNode[] }) {
       </body>
     </html>
   `;
-            }
+        }
 
-            if (css) {
-                html = html.includes("</head>")
-                    ? html.replace("</head>", `<style>${css}</style></head>`)
-                    : `<style>${css}</style>${html}`;
-            }
+        if (css) {
+            html = html.includes("</head>")
+                ? html.replace("</head>", `<style>${css}</style></head>`)
+                : `<style>${css}</style>${html}`;
+        }
 
-            if (js) {
-                const script = `<script>\n${js}\n</script>`;
-                html = html.includes("</body>") ? html.replace("</body>", `${script}</body>`) : html + script;
-            }
+        if (js) {
+            const script = `<script>\n${js}\n</script>`;
+            html = html.includes("</body>") ? html.replace("</body>", `${script}</body>`) : html + script;
+        }
 
-            return html;
-        },
-        [tree],
-    );
+        return html;
+    }, [tree]);
 
     return (
         <div className="flex h-full w-full flex-col bg-white">
-            <div className="flex h-10 shrink-0 items-center justify-between bg-[#111113] px-4">
+            <div className="flex h-10 shrink-0 items-center justify-between bg-[#111113] px-4 border-b border-white/6">
                 <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-emerald-400" />
                     <span className="text-xs text-zinc-300">Preview</span>
                 </div>
+
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setRefreshKey((k) => k + 1)}
+                    className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
+                    title="Reload Preview"
+                >
+                    <RefreshCw size={12} />
+                    <span className="hidden sm:inline text-[11px]">Reload</span>
+                </motion.button>
             </div>
 
             <div className="min-h-0 flex-1 bg-white">
                 <iframe
+                    key={refreshKey}
                     title="Project Preview"
                     srcDoc={srcDoc}
                     sandbox="allow-scripts allow-forms allow-modals"

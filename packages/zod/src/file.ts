@@ -22,6 +22,16 @@ export interface FileTreeNode extends File {
     children: FileTreeNode[];
 }
 
+export type CompactFileTreeNode = {
+    _id: string;
+    parentId: string | null;
+    name: string;
+    type: "file" | "folder";
+    language: string;
+    extension: string;
+    children: CompactFileTreeNode[];
+};
+
 export const FilesSchema = z.array(FileSchema);
 
 export const CreateRootFolderSchema = z.object({
@@ -31,7 +41,7 @@ export const CreateRootFolderSchema = z.object({
 
 export const CreateFolderSchema = z.object({
     projectId: z.string().min(1, "Project ID is required"),
-    parentId: z.string().min(1, "Parent ID is required"),
+    parentId: z.string().nullable(),
     name: z.string().min(1, "Folder name is required"),
 });
 export type CreateRootFolder = z.infer<typeof CreateRootFolderSchema>;

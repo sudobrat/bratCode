@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { deleteProject, toggleStar } from "../features/project";
 import {
-    setCurrentProject,
     setDeleteProject,
     starProject,
 } from "../redux/projectSlice";

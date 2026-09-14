@@ -2,8 +2,7 @@ import type { FileTreeNode } from "@bratCode/zod";
 import { AnimatePresence, motion } from "motion/react";
 import { getFileIcon } from "../utils/customizeIcon";
 import { Check, ChevronRight, Loader2, Save, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { updateFile } from "../features/file";
+import { useEffect, useMemo, useRef, useState } from "react";
 import MonacoEditor from "@monaco-editor/react";
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -51,8 +50,11 @@ function Editor({
     openTabs,
     activeTab,
     setActiveTab,
-    setOpenTabs,
     tree,
+    unsavedFiles,
+    onContentChange,
+    onSaveFile,
+    closeFile,
 }: {
     openTabs: FileTreeNode[];
     activeTab: FileTreeNode | null;
@@ -63,20 +65,43 @@ function Editor({
         tabs: FileTreeNode[] | ((prev: FileTreeNode[]) => FileTreeNode[]),
     ) => void;
     tree: FileTreeNode[];
+    unsavedFiles: Record<string, string>;
+    onContentChange: (
+        fileId: string,
+        newContent: string,
+        originalContent?: string,
+    ) => void;
+    onSaveFile: (fileId: string, content: string) => Promise<void>;
+    closeFile: (id: string) => void;
 }) {
-
-
-    useEffect(() => {
-        if(activeTab){
-            setCode(activeTab?.content)
-        }
-    }, [activeTab])
-    
-
-
     const [saving, setSaving] = useState(false);
     const [justSaved, setJustSaved] = useState(false);
-    const [code, setCode] = useState("");
+    const [code, setCode] = useState(() => {
+        if (!activeTab) return "";
+        return unsavedFiles[activeTab._id] !== undefined
+            ? unsavedFiles[activeTab._id]
+            : activeTab.content || "";
+    });
+
+    useEffect(() => {
+        if (activeTab) {
+            const val =
+                unsavedFiles[activeTab._id] !== undefined
+                    ? unsavedFiles[activeTab._id]
+                    : activeTab.content || "";
+            setCode(val);
+        } else {
+            setCode("");
+        }
+    }, [activeTab?._id, activeTab?.content]);
+
+    const handleCodeChange = (newVal: string | undefined) => {
+        const val = newVal || "";
+        setCode(val);
+        if (activeTab) {
+            onContentChange(activeTab._id, val, activeTab.content);
+        }
+    };
 
     const nodeMap = useMemo(() => flattenTree(tree), [tree]);
 
@@ -85,65 +110,55 @@ function Editor({
         return buildPath(activeTab, nodeMap);
     }, [activeTab, nodeMap]);
 
-    const handleCloseTab = (id: string) => {
-        setOpenTabs((prevTabs) => {
-            const newTabs = prevTabs.filter((tab) => tab._id !== id);
-            setActiveTab((prevActive) => {
-                if (prevActive?._id === id) {
-                    return newTabs.length > 0 ? newTabs[newTabs.length - 1] : null;
-                }
-                return prevActive;
-            });
-            return newTabs;
-        });
-    };
+    const isCurrentUnsaved = activeTab
+        ? Boolean(
+              unsavedFiles[activeTab._id] !== undefined &&
+                  unsavedFiles[activeTab._id] !== (activeTab.content || ""),
+          )
+        : false;
 
     const save = async () => {
-        if (!activeTab) return;
+        if (!activeTab || saving) return;
         try {
             setSaving(true);
-            await updateFile(activeTab._id, {
-                name: activeTab.name,
-                content: code,
-            });
-            setActiveTab({ ...activeTab, content: code });
-
-            setOpenTabs((tabs) =>
-                tabs.map((tab) =>
-                    tab._id === activeTab._id
-                        ? { ...tab, content: code }
-                        : tab,
-                ),
-            );
+            await onSaveFile(activeTab._id, code);
             setJustSaved(true);
             setSaving(false);
             setTimeout(() => setJustSaved(false), 1500);
         } catch (error) {
             setSaving(false);
-            console.log(error);
+            console.error("Failed to save file:", error);
         }
     };
 
+    const saveRef = useRef(save);
+    saveRef.current = save;
+
+    // Window keydown listener for Ctrl+S / Cmd+S (fallback when Monaco does not have direct focus)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
                 e.preventDefault();
-                save();
+                e.stopPropagation();
+                saveRef.current();
             }
         };
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeTab, code, openTabs]);
-
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
 
     return (
         <div className="flex flex-1 flex-col bg-[#0a0a0c]">
             <div className="flex h-10 shrink-0 items-center overflow-x-auto border-b border-white/6 bg-[#111113]/90">
                 <AnimatePresence initial={false}>
                     {openTabs.map((tab) => {
-                        const active = activeTab?._id == tab?._id;
+                        const active = activeTab?._id === tab?._id;
                         const { icon: Icon, color } = getFileIcon(tab.name);
+                        const isUnsaved = Boolean(
+                            unsavedFiles[tab._id] !== undefined &&
+                                unsavedFiles[tab._id] !== (tab.content || ""),
+                        );
 
                         return (
                             <motion.div
@@ -153,6 +168,7 @@ function Editor({
                                 exit={{ opacity: 0, width: 0 }}
                                 transition={{ duration: 0.15 }}
                                 onClick={() => setActiveTab(tab)}
+                                title={isUnsaved ? `${tab.name} • Unsaved` : tab.name}
                                 className={`group relative flex h-full cursor-pointer items-center gap-2 whitespace-nowrap border-r border-white/5 px-3.5 transition-colors ${
                                     active
                                         ? "bg-[#0a0a0c] text-white"
@@ -162,15 +178,37 @@ function Editor({
                                 <Icon size={14} className={color} />
                                 <span className="text-[13px]">{tab?.name}</span>
 
-                                <button
-                                    className="rounded p-0.5 text-zinc-500 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleCloseTab(tab._id);
-                                    }}
-                                >
-                                    <X size={13} />
-                                </button>
+                                <div className="relative flex h-4 w-4 items-center justify-center">
+                                    {isUnsaved ? (
+                                        <>
+                                            <span
+                                                title="Unsaved changes"
+                                                className="h-2 w-2 rounded-full bg-amber-400 shadow-xs shadow-amber-400/50 group-hover:hidden transition-opacity"
+                                            />
+                                            <button
+                                                className="hidden rounded p-0.5 text-zinc-400 hover:bg-white/10 hover:text-white group-hover:flex"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    closeFile(tab._id);
+                                                }}
+                                                title="Close"
+                                            >
+                                                <X size={13} />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            className="rounded p-0.5 text-zinc-500 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100 transition-opacity"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                closeFile(tab._id);
+                                            }}
+                                            title="Close"
+                                        >
+                                            <X size={13} />
+                                        </button>
+                                    )}
+                                </div>
 
                                 {active && (
                                     <motion.div
@@ -218,8 +256,8 @@ function Editor({
                     </div>
 
                     <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={save}
                         disabled={saving}
                         title={
@@ -227,12 +265,16 @@ function Editor({
                                 ? "Saving…"
                                 : justSaved
                                   ? "Saved!"
-                                  : "Save file"
+                                  : isCurrentUnsaved
+                                    ? "Unsaved changes (Ctrl+S to save)"
+                                    : "Save file (Ctrl+S)"
                         }
-                        className={`ml-2 flex shrink-0 items-center justify-center rounded-md p-1.5 transition-colors ${
+                        className={`ml-2 flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                             justSaved
-                                ? "text-emerald-400"
-                                : "text-zinc-500 hover:bg-white/8 hover:text-zinc-200"
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : isCurrentUnsaved
+                                  ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25"
+                                  : "text-zinc-500 hover:bg-white/8 hover:text-zinc-200 border border-transparent"
                         } disabled:cursor-not-allowed disabled:opacity-40`}
                     >
                         <AnimatePresence initial={false} mode="wait">
@@ -244,7 +286,7 @@ function Editor({
                                     exit={{ opacity: 0 }}
                                 >
                                     <Loader2
-                                        size={14}
+                                        size={13}
                                         className="animate-spin"
                                     />
                                 </motion.div>
@@ -254,8 +296,10 @@ function Editor({
                                     initial={{ opacity: 0, scale: 0.5 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     exit={{ opacity: 0 }}
+                                    className="flex items-center gap-1"
                                 >
-                                    <Check size={14} />
+                                    <Check size={13} />
+                                    <span>Saved</span>
                                 </motion.div>
                             ) : (
                                 <motion.div
@@ -263,8 +307,12 @@ function Editor({
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
+                                    className="flex items-center gap-1"
                                 >
-                                    <Save size={14} />
+                                    <Save size={13} />
+                                    {isCurrentUnsaved && (
+                                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                    )}
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -272,13 +320,33 @@ function Editor({
                 </div>
             )}
 
-            <div className='min-h-0 flex-1'>
+            <div className="min-h-0 flex-1">
                 <MonacoEditor
                     height="100%"
                     theme="bratCode-dark"
                     language={getMonacoLanguage(activeTab?.language)}
                     value={code}
-                    onChange={(value) => setCode(value || "")}
+                    onChange={handleCodeChange}
+                    onMount={(editor, monaco) => {
+                        // Register Ctrl+S / Cmd+S command when Monaco editor has focus
+                        editor.addCommand(
+                            monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+                            () => {
+                                saveRef.current();
+                            },
+                        );
+                        // Register in Monaco's action palette
+                        editor.addAction({
+                            id: "save-file",
+                            label: "Save File",
+                            keybindings: [
+                                monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+                            ],
+                            run: () => {
+                                saveRef.current();
+                            },
+                        });
+                    }}
                     beforeMount={(monaco) => {
                         monaco.editor.defineTheme("bratCode-dark", {
                             base: "vs-dark",

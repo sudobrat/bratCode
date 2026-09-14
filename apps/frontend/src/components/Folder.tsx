@@ -26,6 +26,7 @@ function Folder({
     reloadTree,
     openFile,
     closeFile,
+    unsavedFileIds,
 }: {
     projectId: string;
     tree: FileTreeNode[];
@@ -33,6 +34,7 @@ function Folder({
     reloadTree: () => Promise<void>;
     openFile: (file: FileTreeNode) => void;
     closeFile: (fileId: string) => void;
+    unsavedFileIds?: Set<string>;
 }) {
     const [open, setOpen] = useState(false);
     const [folderName, setFolderName] = useState("");
@@ -89,11 +91,13 @@ function Folder({
 
     if (node.type == "file") {
         const { icon: Icon, color } = getFileIcon(node.name);
+        const isUnsaved = unsavedFileIds?.has(node._id);
         return (
             <div className="relative" onClick={() => openFile(node)}>
                 <motion.div
                     whileHover={{ x: 2 }}
                     transition={{ duration: 0.15, ease: "easeOut" }}
+                    title={isUnsaved ? `${node.name} (unsaved changes)` : node.name}
                     className="group flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5 transition-colors"
                     onContextMenu={(e) => {
                         e.preventDefault();
@@ -106,10 +110,23 @@ function Folder({
                     <div className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5">
                         <Icon size={13} className={color} />
 
-                        <span className="truncate text-[13px] text-zinc-300 transition-colors group-hover:text-white">
+                        <span
+                            className={`truncate text-[13px] transition-colors ${
+                                isUnsaved
+                                    ? "text-zinc-100 font-medium"
+                                    : "text-zinc-300 group-hover:text-white"
+                            }`}
+                        >
                             {node.name}
                         </span>
                     </div>
+
+                    {isUnsaved && (
+                        <span
+                            title="Unsaved changes"
+                            className="ml-auto mr-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400 shadow-xs shadow-amber-400/60"
+                        />
+                    )}
                 </motion.div>
 
                 {menu &&
@@ -348,6 +365,7 @@ function Folder({
                             node={child}
                             openFile={openFile}
                             closeFile={closeFile}
+                            unsavedFileIds={unsavedFileIds}
                         />
                     ))}
                 </motion.div>

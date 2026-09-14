@@ -1,6 +1,6 @@
 import { env } from "./config/env";
 import express from "express";
-import type { Response } from "express";
+import type { RequestHandler, Response } from "express";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -22,9 +22,10 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(morgan("dev"));
 
-app.use("/api/auth", proxy(env.AUTH_SERVICE));
+app.use("/api/auth", proxy(env.AUTH_SERVICE) as RequestHandler);
 app.use("/api/project", protect, proxyWithHeader(env.PROJECT_SERVICE));
 app.use("/api/file", protect, proxyWithHeader(env.FILE_SERVICE));
+app.use("/api/ai", protect, proxyWithHeader(env.AI_SERVICE));
 
 app.get("/api/me", protect, getCurrentUser);
 

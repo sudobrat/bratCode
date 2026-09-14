@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import ActivityBar from "../components/ActivityBar";
 import TopBar from "../components/TopBar";
 import { AnimatePresence, motion } from "motion/react";
@@ -7,13 +7,32 @@ import { useParams } from "react-router-dom";
 import { getProjectById } from "../features/project";
 import { useDispatch } from "react-redux";
 import { setCurrentProject } from "../redux/projectSlice";
-import { getTree } from "../features/file";
+import { getTree, updateFile } from "../features/file";
 import type { FileTreeNode } from "@bratCode/zod";
 import { Bot, Code2, Eye, Files, Maximize2, Minimize2, TerminalSquare } from "lucide-react";
 import Editor from "../components/Editor";
 import Preview from "../components/Preview";
 import Terminal from "../components/Terminal";
 import AIChat from "../components/AIChat";
+
+function updateTreeNodeContent(
+    nodes: FileTreeNode[],
+    fileId: string,
+    newContent: string,
+): FileTreeNode[] {
+    return nodes.map((node) => {
+        if (node._id === fileId) {
+            return { ...node, content: newContent };
+        }
+        if (node.children?.length) {
+            return {
+                ...node,
+                children: updateTreeNodeContent(node.children, fileId, newContent),
+            };
+        }
+        return node;
+    });
+}
 
 function ProjectPage() {
     const { id } = useParams();
@@ -28,6 +47,12 @@ function ProjectPage() {
     const [openTabs, setOpenTabs] = useState<FileTreeNode[]>([]);
     const [activeTab, setActiveTab] = useState<FileTreeNode | null>(null);
     const [mobilePane, setMobilePane] = useState<"explorer" | "editor" | "chat">("explorer");
+    const [unsavedFiles, setUnsavedFiles] = useState<Record<string, string>>({});
+
+    const unsavedFileIds = useMemo(
+        () => new Set(Object.keys(unsavedFiles)),
+        [unsavedFiles],
+    );
 
     const dispatch = useDispatch();
 
@@ -45,6 +70,17 @@ function ProjectPage() {
         handleGetProject();
         loadTree();
     }, [id]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (Object.keys(unsavedFiles).length > 0) {
+                e.preventDefault();
+                e.returnValue = "";
+            }
+        };
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, [unsavedFiles]);
 
     const openFile = (file: FileTreeNode) => {
         const exists = openTabs.find((tab) => tab._id === file._id);
@@ -66,6 +102,61 @@ function ProjectPage() {
                 return prevActive;
             });
             return newTabs;
+        });
+        setUnsavedFiles((prev) => {
+            if (!(fileId in prev)) return prev;
+            const next = { ...prev };
+            delete next[fileId];
+            return next;
+        });
+    };
+
+    const handleContentChange = (
+        fileId: string,
+        newContent: string,
+        originalContent?: string,
+    ) => {
+        setUnsavedFiles((prev) => {
+            if (newContent === (originalContent ?? "")) {
+                if (!(fileId in prev)) return prev;
+                const next = { ...prev };
+                delete next[fileId];
+                return next;
+            }
+            return { ...prev, [fileId]: newContent };
+        });
+    };
+
+    const handleSaveFile = async (fileId: string, content: string) => {
+        const targetFile =
+            openTabs.find((tab) => tab._id === fileId) ||
+            (activeTab?._id === fileId ? activeTab : null);
+        const fileName = targetFile?.name || "";
+
+        await updateFile(fileId, {
+            name: fileName,
+            content,
+        });
+
+        // Immediately update tree in state so Preview reflects the newly saved CSS/HTML/JS
+        setTree((prevTree) => updateTreeNodeContent(prevTree, fileId, content));
+
+        // Update openTabs in state
+        setOpenTabs((prevTabs) =>
+            prevTabs.map((tab) => (tab._id === fileId ? { ...tab, content } : tab)),
+        );
+
+        // Update activeTab if it's the saved tab
+        setActiveTab((prevActive) =>
+            prevActive?._id === fileId ? { ...prevActive, content } : prevActive,
+        );
+
+        // Clear from unsaved buffer
+        setUnsavedFiles((prev) => {
+            if (!(fileId in prev)) return prev;
+            const next = { ...prev };
+            delete next[fileId];
+            return next;
         });
     };
 
@@ -96,6 +187,7 @@ function ProjectPage() {
                                 openFile={openFile}
                                 closeFile={closeFile}
                                 reloadTree={loadTree}
+                                unsavedFileIds={unsavedFileIds}
                             />
                         )}
                     </AnimatePresence>
@@ -170,6 +262,10 @@ function ProjectPage() {
                                 setActiveTab={setActiveTab}
                                 setOpenTabs={setOpenTabs}
                                 tree={tree}
+                                unsavedFiles={unsavedFiles}
+                                onContentChange={handleContentChange}
+                                onSaveFile={handleSaveFile}
+                                closeFile={closeFile}
                             />
                         ) : (
                             <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-[#0a0a0c] text-zinc-600">
@@ -211,7 +307,7 @@ function ProjectPage() {
 
                 <div className={`${mobilePane === "chat" ? "flex" : "hidden"} w-full md:flex md:w-auto`}>
                     <AnimatePresence initial={false}>
-                        {showAIChat && <AIChat projectId={id} onClose={() => setShowAIChat(false)} />}
+                        {showAIChat && <AIChat projectId={id} reloadTree={loadTree} />}
                     </AnimatePresence>
                 </div>
             </div>

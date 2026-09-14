@@ -9,12 +9,14 @@ function Explorer({
     reloadTree,
     openFile,
     closeFile,
+    unsavedFileIds,
 }: {
     projectId: string;
     tree: FileTreeNode[];
     reloadTree: () => Promise<void>;
     openFile: (file: FileTreeNode) => void;
     closeFile: (fileId: string) => void;
+    unsavedFileIds?: Set<string>;
 }) {
     return (
         <motion.div
@@ -66,6 +68,7 @@ function Explorer({
                             reloadTree={reloadTree}
                             openFile={openFile}
                             closeFile={closeFile}
+                            unsavedFileIds={unsavedFileIds}
                         />
                     ))
                 )}
