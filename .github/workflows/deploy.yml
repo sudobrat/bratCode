@@ -122,7 +122,11 @@ jobs:
 
             - name: Build & Push Frontend
               run: |
-                  docker build -f Dockerfile.frontend -t ${{ needs.terraform.outputs.acr_login_server }}/frontend-app:latest .
+                  docker build -f Dockerfile.frontend \
+                    --build-arg VITE_SERVER_URL="http://api.bratcode.bharatrajsingal.online" \
+                    --build-arg VITE_FIREBASE_API_KEY="${{ secrets.VITE_FIREBASE_API_KEY }}" \
+                    --build-arg VITE_TERMINAL_SERVICE_URL="http://terminal.bratcode.bharatrajsingal.online" \
+                    -t ${{ needs.terraform.outputs.acr_login_server }}/frontend-app:latest .
                   docker push ${{ needs.terraform.outputs.acr_login_server }}/frontend-app:latest
 
     deploy-k8s:
@@ -204,6 +208,12 @@ jobs:
 
                   # Update A record for api.bratcode.bharatrajsingal.online
                   curl -f -s --show-error -X PUT "https://api.godaddy.com/v1/domains/bharatrajsingal.online/records/A/api.bratcode" \
+                  -H "Authorization: Bearer ${{ secrets.GODADDY_PAT }}" \
+                  -H "Content-Type: application/json" \
+                  -d '[{"data": "'$IP'", "ttl": 600}]'
+
+                  # Update A record for terminal.bratcode.bharatrajsingal.online
+                  curl -f -s --show-error -X PUT "https://api.godaddy.com/v1/domains/bharatrajsingal.online/records/A/terminal.bratcode" \
                   -H "Authorization: Bearer ${{ secrets.GODADDY_PAT }}" \
                   -H "Content-Type: application/json" \
                   -d '[{"data": "'$IP'", "ttl": 600}]'

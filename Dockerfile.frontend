@@ -23,6 +23,16 @@ COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN pnpm install --frozen-lockfile
 
 COPY --from=pruner /app/out/full/ .
+# Accept build arguments for Vite
+ARG VITE_SERVER_URL
+ARG VITE_FIREBASE_API_KEY
+ARG VITE_TERMINAL_SERVICE_URL
+
+# Make them available as environment variables during the build step
+ENV VITE_SERVER_URL=$VITE_SERVER_URL
+ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
+ENV VITE_TERMINAL_SERVICE_URL=$VITE_TERMINAL_SERVICE_URL
+
 # Build the React/Vite app! This creates a 'dist' folder full of static HTML/JS/CSS
 RUN pnpm run build --filter=frontend
 

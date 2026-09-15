@@ -38,3 +38,15 @@ spec:
                             name: gateway-service
                             port:
                                 number: 8000
+
+        # 3. Traffic for the Terminal WebSockets goes to the Terminal Service
+        - host: terminal.bratcode.bharatrajsingal.online
+          http:
+              paths:
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: terminal-service
+                            port:
+                                number: 8005
