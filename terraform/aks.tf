@@ -9,7 +9,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
     
     # Cost-saving measure: We use a Burst series VM (2 vCPU, 4GB RAM) which is very cheap.
     # When you apply/destroy frequently, this keeps your idle bill extremely low.
-    vm_size    = "Standard_B2s" 
+    vm_size    = "Standard_B2s_v2" 
     
     # Keep costs minimal for testing
     node_count = 1

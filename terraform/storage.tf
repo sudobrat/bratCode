@@ -1,6 +1,6 @@
 # Storage Account for our PVCs (Persistent Volume Claims)
 resource "azurerm_storage_account" "storage" {
-  name                     = "${var.prefix}storage${random_string.acr_suffix.result}"
+  name                     = "${lower(var.prefix)}storage${random_string.acr_suffix.result}"
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
   
