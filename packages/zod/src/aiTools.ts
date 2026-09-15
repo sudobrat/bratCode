@@ -8,7 +8,7 @@ export const getFileToolSchema = z.object({
 
 export const createFolderToolSchema = z.object({
     name: z.string(),
-    parentId: z.string().nullable(),
+    parentId: z.string().optional(),
 });
 
 export const createFileToolSchema = z.object({
