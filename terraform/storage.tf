@@ -14,7 +14,7 @@ resource "azurerm_storage_account" "storage" {
 # The actual File Share that will act as the "ide-pvc" hard drive
 resource "azurerm_storage_share" "ide_share" {
   name                 = "ide-pvc-share"
-  storage_account_id = azurerm_storage_account.storage.id
+  storage_account_name = azurerm_storage_account.storage.name
   quota                = 10 # 10 GB limit to keep costs low
 }
 
