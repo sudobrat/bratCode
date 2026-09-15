@@ -167,11 +167,14 @@ jobs:
             - name: Apply Kubernetes Manifests
               run: |
                   # Replace YOUR_REGISTRY with the actual ACR server dynamically
-                  sed -i "s|YOUR_REGISTRY|${{ needs.terraform.outputs.acr_login_server }}|g" k8s/deployments.yaml
+                  sed -i "s/YOUR_REGISTRY/${{ needs.terraform.outputs.acr_login_server }}/g" k8s/deployments.yaml
                   kubectl apply -f k8s/rbac.yaml
                   kubectl apply -f k8s/services.yaml
                   kubectl apply -f k8s/deployments.yaml
                   kubectl apply -f k8s/pvc.yaml
+
+                  # Force Kubernetes to pull the new :latest images!
+                  kubectl get deployments -o name | xargs -r kubectl rollout restart
 
             - name: Install Nginx Ingress Controller
               run: |
