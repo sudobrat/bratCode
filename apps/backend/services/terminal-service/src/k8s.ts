@@ -77,6 +77,7 @@ export async function createPodForProject(projectId: string, projectName: string
         const existingPod = await k8sCoreApi.readNamespacedPod({ name: podName, namespace: K8S_NAMESPACE });
         if (existingPod) {
             log(`Pod ${podName} already exists`);
+            await createServiceForProject(projectId);
             return podName;
         }
     } catch (err: any) {
