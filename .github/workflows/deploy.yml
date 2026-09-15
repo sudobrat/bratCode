@@ -95,6 +95,7 @@ jobs:
             - name: Inject Firebase Credentials
               run: |
                   echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > apps/backend/services/auth-service/serviceAccountKey.json
+                  sed -i '/serviceAccountKey.json/d' .gitignore
 
             - name: Build & Push
               run: |

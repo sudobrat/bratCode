@@ -1,0 +1,10 @@
+packages:
+- apps/*
+- apps/backend/*
+- apps/backend/services/*
+- packages/*
+allowBuilds:
+  '@firebase/util': true
+  '@swc/core': true
+  esbuild: true
+  protobufjs: true
