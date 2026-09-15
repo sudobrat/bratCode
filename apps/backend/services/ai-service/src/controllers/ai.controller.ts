@@ -39,6 +39,7 @@ const sendEvent = (res: Response, type: string, data: any) => {
 
 export const chat = async (req: Request, res: Response) => {
     let disconnected = false;
+    let keepAlive: NodeJS.Timeout | undefined;
     try {
         const { projectId, message, history = [] } = req.body;
         const userId = req.headers["x-user-id"] as string;
@@ -94,6 +95,17 @@ export const chat = async (req: Request, res: Response) => {
             res.end();
             return;
         }
+
+        keepAlive = setInterval(() => {
+            if (!res.writableEnded) {
+                res.write(":\n\n"); // SSE comment to keep connection alive
+                (res as any).flush?.();
+            }
+        }, 15000);
+
+        res.once("close", () => {
+            clearInterval(keepAlive);
+        });
 
         const stream = await graphData.stream(
             {
@@ -160,6 +172,7 @@ export const chat = async (req: Request, res: Response) => {
         }
 
         if (!disconnected && !res.writableEnded) {
+            clearInterval(keepAlive);
             sendEvent(res, "done", {
                 success: true,
                 message: finalMessage || "done",
@@ -167,6 +180,7 @@ export const chat = async (req: Request, res: Response) => {
             res.end();
         }
     } catch (error: any) {
+        clearInterval(keepAlive);
         log("AI STREAM ERROR:", error);
         if (disconnected) {
             return;
