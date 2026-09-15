@@ -172,6 +172,9 @@ importers:
       turbo:
         specifier: ^2.10.12
         version: 2.10.12
+      unrun:
+        specifier: ^0.3.1
+        version: 0.3.1
 
   apps/backend/gateway:
     dependencies:
@@ -296,7 +299,7 @@ importers:
         version: 10.10.0(jiti@2.7.0)(supports-color@7.2.0)
       tsdown:
         specifier: ^0.23.0
-        version: 0.23.0(tsx@4.23.13)(typescript@7.0.2)
+        version: 0.23.0(tsx@4.23.13)(typescript@7.0.2)(unrun@0.3.1)
       tsx:
         specifier: ^4.23.13
         version: 4.23.13
@@ -5466,6 +5469,16 @@ packages:
   unpipe@1.0.0:
     resolution: {integrity: sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ==}
     engines: {node: '>= 0.8'}
+
+  unrun@0.3.1:
+    resolution: {integrity: sha512-onIck/oNnCaytwths1ZVp1LK2Gq2hPoyFhiHebObuUXqR3S0uHuLLaBK8K6mRRgV7Ptip8AnNvaUsgzwWwBZuA==}
+    engines: {node: ^22.13.0 || >=24.0.0}
+    hasBin: true
+    peerDependencies:
+      synckit: ^0.11.11
+    peerDependenciesMeta:
+      synckit:
+        optional: true
 
   update-browserslist-db@1.3.2:
     resolution: {integrity: sha512-UQ+MSxlhRm1bzjhU+DcuXfjFO1FzNtqhK5+9Yvlp90ItDLk5vT932A0rFu619nf7RVS+Y/VeaUW1jaRDqZ8VJw==}
@@ -10671,7 +10684,7 @@ snapshots:
       - supports-color
       - vue-tsc
 
-  tsdown@0.23.0(tsx@4.23.13)(typescript@7.0.2):
+  tsdown@0.23.0(tsx@4.23.13)(typescript@7.0.2)(unrun@0.3.1):
     dependencies:
       cac: 7.0.0
       defu: 6.1.7
@@ -10690,6 +10703,7 @@ snapshots:
     optionalDependencies:
       tsx: 4.23.13
       typescript: 7.0.2
+      unrun: 0.3.1
     transitivePeerDependencies:
       - '@typescript/native-preview'
       - '@volar/typescript'
@@ -10824,6 +10838,10 @@ snapshots:
   undici@8.10.2: {}
 
   unpipe@1.0.0: {}
+
+  unrun@0.3.1:
+    dependencies:
+      rolldown: 1.2.7
 
   update-browserslist-db@1.3.2(browserslist@4.28.9):
     dependencies:
