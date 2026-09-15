@@ -92,6 +92,10 @@ jobs:
             - name: Log into ACR
               run: az acr login --name ${{ needs.terraform.outputs.acr_name }}
 
+            - name: Inject Firebase Credentials
+              run: |
+                  echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > apps/backend/services/auth-service/serviceAccountKey.json
+
             - name: Build & Push
               run: |
                   docker build -f Dockerfile.backend --build-arg SERVICE_NAME=${{ matrix.service }} -t ${{ needs.terraform.outputs.acr_login_server }}/${{ matrix.service }}:latest .
