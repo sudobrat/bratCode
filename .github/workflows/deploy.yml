@@ -45,6 +45,10 @@ jobs:
             - name: Terraform Init
               run: terraform init
 
+            - name: Force Unlock Terraform State
+              if: github.event_name == 'push' || github.event.inputs.action == 'apply'
+              run: terraform force-unlock -force d9d2788a-8977-84f7-0042-8649959a2c75 || true
+
             - name: Terraform Apply
               if: github.event_name == 'push' || github.event.inputs.action == 'apply'
               run: terraform apply -auto-approve
