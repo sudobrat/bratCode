@@ -15,6 +15,11 @@ resource "azurerm_kubernetes_cluster" "aks" {
     node_count = 1
   }
 
+  # Azure enables this by default now, so we must explicitly tell Terraform 
+  # to expect it, otherwise Terraform will try to disable it and fail!
+  oidc_issuer_enabled = true
+  workload_identity_enabled = true
+
   identity {
     type = "SystemAssigned"
   }
