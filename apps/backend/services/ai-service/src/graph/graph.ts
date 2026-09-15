@@ -265,7 +265,7 @@ HTML + CSS + JAVASCRIPT
 ==================================================
 
 For plain frontend projects prefer:
-
+"You are already inside the project root. DO NOT create a folder named 'project' or 'project-root'. Place root files directly in the environment."
 project-root/
 ├── index.html
 ├── style.css
