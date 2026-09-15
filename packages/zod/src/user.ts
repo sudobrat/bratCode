@@ -6,6 +6,7 @@ export const UserSchema = z.object({
     name: z.string(),
     email: z.string().email(),
     avatar: z.string().default(""),
+    credits: z.number().default(0),
     createdAt: z.coerce.string(),
     updatedAt: z.coerce.string(),
 });
@@ -17,6 +18,7 @@ export const SessionUserSchema = z.object({
     name: z.string(),
     email: z.string().email(),
     avatar: z.string().default(""),
+    credits: z.number().default(0),
 });
 
 export type SessionUser = z.infer<typeof SessionUserSchema>;

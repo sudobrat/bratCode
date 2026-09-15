@@ -168,7 +168,6 @@ function AiChat({
                         onEvent(eventType, data);
 
                         console.log("eventType", eventType);
-                        console.log("data", data);
                     }
                 }
             } finally {
@@ -184,7 +183,7 @@ function AiChat({
     return (
         <div className="flex w-80 shrink-0 flex-col border-l border-white/6 bg-[#111113]/90 backdrop-blur-xl">
             <div className="flex h-10 shrink-0 items-center gap-2 border-b border-white/6 px-3">
-                <span className="text-xs font-semibold tracking-wider text-zinc-300">VertexAI Chat</span>
+                <span className="text-xs font-semibold tracking-wider text-zinc-300">bratCode Chat</span>
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto p-3">

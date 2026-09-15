@@ -3,6 +3,7 @@ import { graph } from "../graph/graph.js";
 import { Request, Response } from "express";
 import { log } from "@bratCode/logger";
 import type { HistoryMessage } from "@bratCode/zod";
+import { deductCredits } from "../utils/deductCredits.js";
 
 const buildHistory = (history?: HistoryMessage[] | unknown) => {
     if (!Array.isArray(history)) {
@@ -83,6 +84,16 @@ export const chat = async (req: Request, res: Response) => {
         const graphData = graph({ projectId, userId });
         const messages = buildHistory(history);
         messages.push(new HumanMessage(message.trim()));
+
+        const creditResult = await deductCredits({ userId, amount: 10 });
+        if (!creditResult.success) {
+            sendEvent(res, "error", {
+                success: false,
+                message: creditResult.error || "insufficient credits",
+            });
+            res.end();
+            return;
+        }
 
         const stream = await graphData.stream(
             {

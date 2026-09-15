@@ -49,7 +49,7 @@ function Explorer({
                     scrollbarColor: "rgba(255,255,255,0.1) transparent",
                 }}
             >
-                {tree?.length === 0 ? (
+                {!tree || tree.length === 0 ? (
                     <div className="flex flex-col items-center gap-2 px-3 py-10 text-center">
                         <FolderTree size={22} className="text-zinc-700" />
                         <span className="text-[12px] text-zinc-600">

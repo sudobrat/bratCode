@@ -99,7 +99,8 @@ export const createFile = async (req: Request, res: Response) => {
             await execCommandInPod(podName, ["mkdir", "-p", dirPath]);
         }
 
-        const { exitCode, stderr } = await execCommandInPod(podName, ["bash", "-c", `cat > "${filePath}"`], content);
+        const script = `require('fs').writeFileSync(${JSON.stringify(filePath)}, Buffer.from("${Buffer.from(content).toString('base64')}", "base64"))`;
+        const { exitCode, stderr } = await execCommandInPod(podName, ["node", "-e", script]);
         if (exitCode !== 0) return res.status(500).json({ message: `Failed to create file: ${stderr}` });
 
         const file = createMockFile(projectId, filePath, name.split("/").pop() || name, "file", parentPath, content);
@@ -111,13 +112,13 @@ export const createFile = async (req: Request, res: Response) => {
 
 export const updateFile = async (req: Request, res: Response) => {
     try {
-        const paramsParsed = ProjectIdParamSchema.safeParse(req.params);
-        if (!paramsParsed.success) return res.status(400).json({ message: "Invalid file ID" });
+        const fileId = req.params.id;
+        if (!fileId) return res.status(400).json({ message: "Invalid file ID" });
         
         const parsed = UpdateFileSchema.safeParse(req.body);
         if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
         
-        const { projectId, filePath } = parseId(paramsParsed.data.id);
+        const { projectId, filePath } = parseId(fileId);
         const { name, content } = parsed.data;
         const podName = await getProjectPod(projectId);
 
@@ -132,7 +133,8 @@ export const updateFile = async (req: Request, res: Response) => {
         }
 
         if (content !== undefined) {
-            await execCommandInPod(podName, ["bash", "-c", `cat > "${targetFilePath}"`], content);
+            const script = `require('fs').writeFileSync(${JSON.stringify(targetFilePath)}, Buffer.from("${Buffer.from(content).toString('base64')}", "base64"))`;
+            await execCommandInPod(podName, ["node", "-e", script]);
         }
 
         const file = createMockFile(
@@ -151,10 +153,10 @@ export const updateFile = async (req: Request, res: Response) => {
 
 export const deleteFile = async (req: Request, res: Response) => {
     try {
-        const paramsParsed = ProjectIdParamSchema.safeParse(req.params);
-        if (!paramsParsed.success) return res.status(400).json({ message: "Invalid file ID" });
+        const fileId = req.params.id;
+        if (!fileId) return res.status(400).json({ message: "Invalid file ID" });
         
-        const { projectId, filePath } = parseId(paramsParsed.data.id);
+        const { projectId, filePath } = parseId(fileId);
         const podName = await getProjectPod(projectId);
 
         await execCommandInPod(podName, ["rm", "-rf", filePath]);
@@ -170,10 +172,10 @@ export const deleteFile = async (req: Request, res: Response) => {
 
 export const getFile = async (req: Request, res: Response) => {
     try {
-        const paramsParsed = ProjectIdParamSchema.safeParse(req.params);
-        if (!paramsParsed.success) return res.status(400).json({ message: "Invalid file ID" });
+        const fileId = req.params.id;
+        if (!fileId) return res.status(400).json({ message: "Invalid file ID" });
         
-        const { projectId, filePath } = parseId(paramsParsed.data.id);
+        const { projectId, filePath } = parseId(fileId);
         const podName = await getProjectPod(projectId);
 
         const { stdout: content, exitCode } = await execCommandInPod(podName, ["cat", filePath]);

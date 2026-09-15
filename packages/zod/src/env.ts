@@ -33,7 +33,7 @@ export const AIServiceEnvSchema = z.object({
     PORT: z.string().default("8004"),
     MONGODB_URI: z.string().url(),
     FILE_SERVICE: z.string().url(),
-    AI_SERVICE: z.string().url(),
+    AUTH_SERVICE: z.string().url(),
     OPENROUTER_API_KEY: z.string(),
 });
 

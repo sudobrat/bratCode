@@ -8,6 +8,9 @@ const app = express();
 
 app.use(express.json());
 
+import paymentRoutes from "./routes/payment.route";
+app.use("/", paymentRoutes);
+
 app.get("/", (_, res: Response) => {
     res.json({
         message: "bratCode Payment Service",

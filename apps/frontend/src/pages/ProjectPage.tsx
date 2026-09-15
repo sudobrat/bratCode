@@ -7,7 +7,7 @@ import { useParams } from "react-router-dom";
 import { getProjectById } from "../features/project";
 import { useDispatch } from "react-redux";
 import { setCurrentProject } from "../redux/projectSlice";
-import { getTree, updateFile } from "../features/file";
+import { getTree, updateFile, getFile } from "../features/file";
 import type { FileTreeNode } from "@bratCode/zod";
 import { Bot, Code2, Eye, Files, Maximize2, Minimize2, TerminalSquare } from "lucide-react";
 import Editor from "../components/Editor";
@@ -82,13 +82,26 @@ function ProjectPage() {
         return () => window.removeEventListener("beforeunload", handleBeforeUnload);
     }, [unsavedFiles]);
 
-    const openFile = (file: FileTreeNode) => {
-        const exists = openTabs.find((tab) => tab._id === file._id);
-
-        if (!exists) {
-            setOpenTabs([...openTabs, file]);
+    const openFile = async (file: FileTreeNode) => {
+        let fullFile = file;
+        // Fetch content if it's a file
+        if (file.type === "file") {
+            const fetched = await getFile(file._id);
+            if (fetched) {
+                // Ensure the children property remains if it existed, though files typically don't have children
+                fullFile = { ...file, ...fetched };
+            }
         }
-        setActiveTab(file);
+
+        setOpenTabs((prevTabs) => {
+            const exists = prevTabs.find((tab) => tab._id === fullFile._id);
+            if (!exists) {
+                return [...prevTabs, fullFile];
+            }
+            return prevTabs.map((tab) => (tab._id === fullFile._id ? fullFile : tab));
+        });
+        
+        setActiveTab(fullFile);
         setShowPreview(false);
     };
 

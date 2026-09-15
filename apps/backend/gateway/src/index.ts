@@ -26,6 +26,7 @@ app.use("/api/auth", proxy(env.AUTH_SERVICE) as RequestHandler);
 app.use("/api/project", protect, proxyWithHeader(env.PROJECT_SERVICE));
 app.use("/api/file", protect, proxyWithHeader(env.FILE_SERVICE));
 app.use("/api/ai", protect, proxyWithHeader(env.AI_SERVICE));
+app.use("/api/payment", protect, proxyWithHeader(env.PAYMENT_SERVICE));
 
 app.get("/api/me", protect, getCurrentUser);
 
