@@ -106,6 +106,12 @@ export async function createPodForProject(projectId: string, projectName: string
                     image: "node:20-bullseye",
                     command: ["/bin/bash", "-c", "sleep infinity"], // Keep the pod running indefinitely
                     workingDir: `/workspace/${projectName}`,
+                    env: [
+                        {
+                            name: "HOST",
+                            value: "0.0.0.0",
+                        },
+                    ],
                     volumeMounts: [
                         {
                             name: "workspace-volume",

@@ -38,6 +38,10 @@ app.use(
                 return path.replace(`/preview/${projectId}/${port}`, "");
             },
             on: {
+                proxyReq: (proxyReq: any, req: any, res: any) => {
+                    // Trick Vite's strict host checking into thinking the request is coming from localhost
+                    proxyReq.setHeader("Host", "localhost");
+                },
                 error: (err: any, req: any, res: any) => {
                     log(`Proxy error for ${projectId}:${port} - ${err.message}`);
                     if (!res.headersSent) {
