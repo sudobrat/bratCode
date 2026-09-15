@@ -8,7 +8,10 @@ export const getFileToolSchema = z.object({
 
 export const createFolderToolSchema = z.object({
     name: z.string(),
-    parentId: z.string().optional(),
+    parentId: z
+        .string()
+        .optional()
+        .describe("ID of the parent folder. Omit this when creating the folder at the project root."),
 });
 
 export const createFileToolSchema = z.object({

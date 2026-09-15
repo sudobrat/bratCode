@@ -122,7 +122,7 @@ The response contains the complete file content.`,
     const createFolderTool = tool(
         async ({ name, parentId }) => {
             log("AI TOOL : CREATE FOLDER");
-            const folder = await createFolder({ userId, projectId: id, parentId, name });
+            const folder = await createFolder({ userId, projectId: id, parentId: parentId!, name });
 
             return JSON.stringify({
                 success: true,
