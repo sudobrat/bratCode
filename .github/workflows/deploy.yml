@@ -72,12 +72,12 @@ jobs:
                 service:
                     [
                         gateway,
-                        auth-service,
-                        file-service,
-                        terminal-service,
-                        project-service,
-                        ai-service,
-                        payment-service,
+                        auth,
+                        file,
+                        terminal,
+                        project,
+                        ai,
+                        payment,
                     ]
 
         steps:

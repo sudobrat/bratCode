@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: YOUR_REGISTRY/gateway-service:latest
+          image: YOUR_REGISTRY/gateway:latest
           ports:
             - containerPort: 8000
           envFrom:
@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
         - name: auth
-          image: YOUR_REGISTRY/auth-service:latest
+          image: YOUR_REGISTRY/auth:latest
           ports:
             - containerPort: 8001
           envFrom:
@@ -66,7 +66,7 @@ spec:
     spec:
       containers:
         - name: project
-          image: YOUR_REGISTRY/project-service:latest
+          image: YOUR_REGISTRY/project:latest
           ports:
             - containerPort: 8002
           envFrom:
@@ -91,7 +91,7 @@ spec:
       serviceAccountName: ide-manager-sa
       containers:
         - name: file
-          image: YOUR_REGISTRY/file-service:latest
+          image: YOUR_REGISTRY/file:latest
           ports:
             - containerPort: 8003
           envFrom:
@@ -114,7 +114,7 @@ spec:
     spec:
       containers:
         - name: ai
-          image: YOUR_REGISTRY/ai-service:latest
+          image: YOUR_REGISTRY/ai:latest
           ports:
             - containerPort: 8004
           envFrom:
@@ -139,7 +139,7 @@ spec:
       serviceAccountName: ide-manager-sa
       containers:
         - name: terminal
-          image: YOUR_REGISTRY/terminal-service:latest
+          image: YOUR_REGISTRY/terminal:latest
           ports:
             - containerPort: 8005
           envFrom:
@@ -162,7 +162,7 @@ spec:
     spec:
       containers:
         - name: payment
-          image: YOUR_REGISTRY/payment-service:latest
+          image: YOUR_REGISTRY/payment:latest
           ports:
             - containerPort: 8006
           envFrom:
