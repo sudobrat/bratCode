@@ -17,9 +17,11 @@ const EXT_TO_LANG: Record<string, string> = {
     sh: "shell",
 };
 
-function getMonacoLanguage(lang?: string): string {
-    if (!lang) return "plaintext";
-    return EXT_TO_LANG[lang] || lang;
+function getMonacoLanguage(filename?: string): string {
+    if (!filename) return "plaintext";
+    const ext = filename.split('.').pop()?.toLowerCase();
+    if (!ext) return "plaintext";
+    return EXT_TO_LANG[ext] || ext;
 }
 
 function flattenTree(
@@ -324,7 +326,7 @@ function Editor({
                 <MonacoEditor
                     height="100%"
                     theme="bratCode-dark"
-                    language={getMonacoLanguage(activeTab?.language)}
+                    language={getMonacoLanguage(activeTab?.name)}
                     value={code}
                     onChange={handleCodeChange}
                     onMount={(editor, monaco) => {
