@@ -50,4 +50,4 @@ USER expressjs
 COPY --from=builder --chown=expressjs:nodejs /app .
 
 # Start the dynamically passed service!
-CMD ["sh", "-c", "pnpm run start --filter=${RUNNER_SERVICE_NAME}"]
+CMD ["sh", "-c", "pnpm --filter=${RUNNER_SERVICE_NAME} run start"]

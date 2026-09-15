@@ -49,6 +49,9 @@ spec:
           envFrom:
             - secretRef:
                 name: app-secrets
+          env:
+            - name: MONGODB_URI
+              value: "$(MONGO_BASE_URI)auth"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -72,6 +75,9 @@ spec:
           envFrom:
             - secretRef:
                 name: app-secrets
+          env:
+            - name: MONGODB_URI
+              value: "$(MONGO_BASE_URI)project"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -97,6 +103,9 @@ spec:
           envFrom:
             - secretRef:
                 name: app-secrets
+          env:
+            - name: MONGODB_URI
+              value: "$(MONGO_BASE_URI)file"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -120,6 +129,9 @@ spec:
           envFrom:
             - secretRef:
                 name: app-secrets
+          env:
+            - name: MONGODB_URI
+              value: "$(MONGO_BASE_URI)ai"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -145,6 +157,9 @@ spec:
           envFrom:
             - secretRef:
                 name: app-secrets
+          env:
+            - name: MONGODB_URI
+              value: "$(MONGO_BASE_URI)terminal"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -168,6 +183,9 @@ spec:
           envFrom:
             - secretRef:
                 name: app-secrets
+          env:
+            - name: MONGODB_URI
+              value: "$(MONGO_BASE_URI)payment"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -191,3 +209,23 @@ spec:
           envFrom:
             - secretRef:
                 name: app-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:latest
+          ports:
+            - containerPort: 6379

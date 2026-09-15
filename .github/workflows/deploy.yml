@@ -143,6 +143,23 @@ jobs:
             - name: Get AKS Credentials
               run: az aks get-credentials --resource-group ${{ needs.terraform.outputs.rg_name }} --name ${{ needs.terraform.outputs.aks_name }} --overwrite-existing
 
+            - name: Create Application Secrets
+              run: |
+                  kubectl create secret generic app-secrets \
+                    --from-literal=FRONTEND_URL="http://bratcode.bharatrajsingal.online" \
+                    --from-literal=AUTH_SERVICE="http://auth-service:8001" \
+                    --from-literal=PROJECT_SERVICE="http://project-service:8002" \
+                    --from-literal=FILE_SERVICE="http://file-service:8003" \
+                    --from-literal=AI_SERVICE="http://ai-service:8004" \
+                    --from-literal=TERMINAL_SERVICE="http://terminal-service:8005" \
+                    --from-literal=PAYMENT_SERVICE="http://payment-service:8006" \
+                    --from-literal=REDIS_URL="redis://redis-service:6379" \
+                    --from-literal=MONGO_BASE_URI="${{ secrets.MONGO_BASE_URI }}" \
+                    --from-literal=OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" \
+                    --from-literal=RAZORPAY_KEY_ID="${{ secrets.RAZORPAY_KEY_ID }}" \
+                    --from-literal=RAZORPAY_KEY_SECRET="${{ secrets.RAZORPAY_KEY_SECRET }}" \
+                    --dry-run=client -o yaml | kubectl apply -f -
+
             - name: Apply Kubernetes Manifests
               run: |
                   # Replace YOUR_REGISTRY with the actual ACR server dynamically
