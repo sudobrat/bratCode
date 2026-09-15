@@ -159,7 +159,7 @@ jobs:
                     --from-literal=PAYMENT_SERVICE="http://payment-service:8006" \
                     --from-literal=REDIS_URL="redis://redis-service:6379" \
                     --from-literal=MONGO_BASE_URI="${{ secrets.MONGO_BASE_URI }}" \
-                    --from-literal=OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" \
+                    --from-literal=GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
                     --from-literal=RAZORPAY_KEY_ID="${{ secrets.RAZORPAY_KEY_ID }}" \
                     --from-literal=RAZORPAY_KEY_SECRET="${{ secrets.RAZORPAY_KEY_SECRET }}" \
                     --dry-run=client -o yaml | kubectl apply -f -
