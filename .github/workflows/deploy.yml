@@ -73,16 +73,7 @@ jobs:
         if: github.event_name == 'push' || github.event.inputs.action == 'apply'
         strategy:
             matrix:
-                service:
-                    [
-                        gateway,
-                        auth,
-                        file,
-                        terminal,
-                        project,
-                        ai,
-                        payment,
-                    ]
+                service: [gateway, auth, file, terminal, project, ai, payment]
 
         steps:
             - name: Checkout Code
@@ -163,7 +154,7 @@ jobs:
                     --from-literal=PAYMENT_SERVICE="http://payment-service:8006" \
                     --from-literal=REDIS_URL="redis://redis-service:6379" \
                     --from-literal=MONGO_BASE_URI="${{ secrets.MONGO_BASE_URI }}" \
-                    --from-literal=GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+                    --from-literal=GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
                     --from-literal=RAZORPAY_KEY_ID="${{ secrets.RAZORPAY_KEY_ID }}" \
                     --from-literal=RAZORPAY_KEY_SECRET="${{ secrets.RAZORPAY_KEY_SECRET }}" \
                     --dry-run=client -o yaml | kubectl apply -f -

@@ -34,7 +34,7 @@ export const AIServiceEnvSchema = z.object({
     MONGODB_URI: z.string().url(),
     FILE_SERVICE: z.string().url(),
     AUTH_SERVICE: z.string().url(),
-    GEMINI_API_KEY: z.string(),
+    GOOGLE_API_KEY: z.string(),
 });
 
 export const TerminalServiceEnvSchema = z.object({
