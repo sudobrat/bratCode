@@ -1,0 +1,193 @@
+# ==========================================
+# KUBERNETES DEPLOYMENTS
+# ==========================================
+# A Deployment manages a set of duplicate Pods. If a Pod crashes, 
+# the Deployment automatically creates a new one.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: YOUR_REGISTRY/gateway-service:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: app-secrets # We will create this in Terraform!
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      containers:
+        - name: auth
+          image: YOUR_REGISTRY/auth-service:latest
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - secretRef:
+                name: app-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: project-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: project
+  template:
+    metadata:
+      labels:
+        app: project
+    spec:
+      containers:
+        - name: project
+          image: YOUR_REGISTRY/project-service:latest
+          ports:
+            - containerPort: 8002
+          envFrom:
+            - secretRef:
+                name: app-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: file-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: file
+  template:
+    metadata:
+      labels:
+        app: file
+    spec:
+      # CRITICAL: This gives the file-service permission to spawn and exec into pods!
+      serviceAccountName: ide-manager-sa
+      containers:
+        - name: file
+          image: YOUR_REGISTRY/file-service:latest
+          ports:
+            - containerPort: 8003
+          envFrom:
+            - secretRef:
+                name: app-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai
+  template:
+    metadata:
+      labels:
+        app: ai
+    spec:
+      containers:
+        - name: ai
+          image: YOUR_REGISTRY/ai-service:latest
+          ports:
+            - containerPort: 8004
+          envFrom:
+            - secretRef:
+                name: app-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terminal-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terminal
+  template:
+    metadata:
+      labels:
+        app: terminal
+    spec:
+      # CRITICAL: This gives the terminal-service permission to spawn and exec into pods!
+      serviceAccountName: ide-manager-sa
+      containers:
+        - name: terminal
+          image: YOUR_REGISTRY/terminal-service:latest
+          ports:
+            - containerPort: 8005
+          envFrom:
+            - secretRef:
+                name: app-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment
+  template:
+    metadata:
+      labels:
+        app: payment
+    spec:
+      containers:
+        - name: payment
+          image: YOUR_REGISTRY/payment-service:latest
+          ports:
+            - containerPort: 8006
+          envFrom:
+            - secretRef:
+                name: app-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: YOUR_REGISTRY/frontend-app:latest
+          ports:
+            - containerPort: 80 # Nginx port
+          envFrom:
+            - secretRef:
+                name: app-secrets

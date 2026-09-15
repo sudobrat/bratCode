@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { TerminalSquare, X, Eraser } from "lucide-react";
+import { TerminalSquare, X, Eraser, ExternalLink } from "lucide-react";
 import { motion } from "motion/react";
 import { Terminal as XTerminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -16,6 +16,13 @@ export default function Terminal({ projectId: _projectId, onClose, onFileChange 
     const containerRef = useRef<HTMLDivElement>(null);
     const terminalRef = useRef<XTerminal | null>(null);
     const [connected, setConnected] = useState(false);
+    const [port, setPort] = useState("5173");
+
+    const handleOpenPreview = () => {
+        const terminalUrl = import.meta.env.VITE_TERMINAL_SERVICE_URL || "http://localhost:8005";
+        const previewUrl = `${terminalUrl}/preview/${projectId}/${port}`;
+        window.open(previewUrl, "_blank");
+    };
 
     useEffect(() => {
         if (!projectId || !userId || !containerRef.current) return;
@@ -144,6 +151,23 @@ export default function Terminal({ projectId: _projectId, onClose, onFileChange 
                 </div>
 
                 <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 mr-2">
+                        <input
+                            type="text"
+                            value={port}
+                            onChange={(e) => setPort(e.target.value)}
+                            placeholder="Port"
+                            className="w-16 rounded border border-white/10 bg-[#1e1e20] px-1.5 py-0.5 text-[11px] text-zinc-300 outline-none focus:border-sky-500/50"
+                        />
+                        <button
+                            onClick={handleOpenPreview}
+                            title="Open Preview in New Tab"
+                            className="flex items-center gap-1 rounded bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-400 transition-colors hover:bg-sky-500/20">
+                            <ExternalLink size={12} />
+                            Preview
+                        </button>
+                    </div>
+
                     <div className="flex items-center gap-2">
                         <span
                             className={`h-1.5 w-1.5 rounded-full ${

@@ -1,0 +1,189 @@
+name: bratCode Deployment
+
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+        inputs:
+            action:
+                description: "Choose Action (apply to build, destroy to delete)"
+                required: true
+                default: "apply"
+                type: choice
+                options:
+                    - apply
+                    - destroy
+
+jobs:
+    terraform:
+        name: "Terraform Infrastructure"
+        runs-on: ubuntu-latest
+        outputs:
+            acr_name: ${{ steps.tf-out.outputs.acr_name }}
+            acr_login_server: ${{ steps.tf-out.outputs.acr_login_server }}
+            rg_name: ${{ steps.tf-out.outputs.rg_name }}
+            aks_name: ${{ steps.tf-out.outputs.aks_name }}
+
+        defaults:
+            run:
+                working-directory: ./terraform
+
+        env:
+            ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+            ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+            ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+            ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            - name: Setup Terraform
+              uses: hashicorp/setup-terraform@v3
+
+            - name: Terraform Init
+              run: terraform init
+
+            - name: Terraform Apply
+              if: github.event_name == 'push' || github.event.inputs.action == 'apply'
+              run: terraform apply -auto-approve
+
+            - name: Export Outputs
+              id: tf-out
+              if: github.event_name == 'push' || github.event.inputs.action == 'apply'
+              run: |
+                  echo "rg_name=$(terraform output -raw resource_group_name)" >> $GITHUB_OUTPUT
+                  echo "acr_name=$(terraform output -raw acr_name)" >> $GITHUB_OUTPUT
+                  echo "acr_login_server=$(terraform output -raw acr_login_server)" >> $GITHUB_OUTPUT
+                  echo "aks_name=$(terraform output -raw aks_cluster_name)" >> $GITHUB_OUTPUT
+
+            - name: Terraform Destroy
+              if: github.event.inputs.action == 'destroy'
+              run: terraform destroy -auto-approve
+
+    build-backend:
+        name: "Build Backend Services"
+        needs: terraform
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' || github.event.inputs.action == 'apply'
+        strategy:
+            matrix:
+                service:
+                    [
+                        gateway,
+                        auth-service,
+                        file-service,
+                        terminal-service,
+                        project-service,
+                        ai-service,
+                        payment-service,
+                    ]
+
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            - name: Log into Azure
+              uses: azure/login@v2
+              with:
+                  creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+            - name: Log into ACR
+              run: az acr login --name ${{ needs.terraform.outputs.acr_name }}
+
+            - name: Build & Push
+              run: |
+                  docker build -f Dockerfile.backend --build-arg SERVICE_NAME=${{ matrix.service }} -t ${{ needs.terraform.outputs.acr_login_server }}/${{ matrix.service }}:latest .
+                  docker push ${{ needs.terraform.outputs.acr_login_server }}/${{ matrix.service }}:latest
+
+    build-frontend:
+        name: "Build Frontend"
+        needs: terraform
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' || github.event.inputs.action == 'apply'
+
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            - name: Log into Azure
+              uses: azure/login@v2
+              with:
+                  creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+            - name: Log into ACR
+              run: az acr login --name ${{ needs.terraform.outputs.acr_name }}
+
+            - name: Build & Push Frontend
+              run: |
+                  docker build -f Dockerfile.frontend -t ${{ needs.terraform.outputs.acr_login_server }}/frontend-app:latest .
+                  docker push ${{ needs.terraform.outputs.acr_login_server }}/frontend-app:latest
+
+    deploy-k8s:
+        name: "Deploy to Kubernetes"
+        needs: [terraform, build-backend, build-frontend]
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' || github.event.inputs.action == 'apply'
+
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            - name: Log into Azure
+              uses: azure/login@v2
+              with:
+                  creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+            - name: Get AKS Credentials
+              run: az aks get-credentials --resource-group ${{ needs.terraform.outputs.rg_name }} --name ${{ needs.terraform.outputs.aks_name }} --overwrite-existing
+
+            - name: Apply Kubernetes Manifests
+              run: |
+                  # Replace YOUR_REGISTRY with the actual ACR server dynamically
+                  sed -i "s|YOUR_REGISTRY|${{ needs.terraform.outputs.acr_login_server }}|g" k8s/deployments.yaml
+                  kubectl apply -f k8s/rbac.yaml
+                  kubectl apply -f k8s/services.yaml
+                  kubectl apply -f k8s/deployments.yaml
+                  kubectl apply -f k8s/pvc.yaml
+
+            - name: Install Nginx Ingress Controller
+              run: |
+                  helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+                  helm repo update
+                  helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+                    --namespace ingress-basic --create-namespace \
+                    --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-health-probe-request-path"=/healthz
+
+            - name: Wait for Public IP
+              id: get-ip
+              run: |
+                  echo "Waiting for Azure to assign a Public IP to the Load Balancer..."
+                  IP=""
+                  while [ -z $IP ]; do
+                    IP=$(kubectl get svc ingress-nginx-controller -n ingress-basic -o jsonpath="{.status.loadBalancer.ingress[0].ip}")
+                    [ -z "$IP" ] && sleep 10
+                  done
+                  echo "Public IP is: $IP"
+                  echo "public_ip=$IP" >> $GITHUB_OUTPUT
+
+                  # Now apply the ingress rules so it routes traffic!
+                  kubectl apply -f k8s/ingress.yaml
+
+            - name: Update GoDaddy DNS
+              run: |
+                  IP="${{ steps.get-ip.outputs.public_ip }}"
+
+                  # Update A record for bratcode.bharatrajsingal.online
+                  curl -f -s --show-error -X PUT "https://api.godaddy.com/v1/domains/bharatrajsingal.online/records/A/bratcode" \
+                  -H "Authorization: Bearer ${{ secrets.GODADDY_PAT }}" \
+                  -H "Content-Type: application/json" \
+                  -d '[{"data": "'$IP'", "ttl": 600}]'
+
+                  # Update A record for api.bratcode.bharatrajsingal.online
+                  curl -f -s --show-error -X PUT "https://api.godaddy.com/v1/domains/bharatrajsingal.online/records/A/api.bratcode" \
+                  -H "Authorization: Bearer ${{ secrets.GODADDY_PAT }}" \
+                  -H "Content-Type: application/json" \
+                  -d '[{"data": "'$IP'", "ttl": 600}]'
+
+                  echo "Successfully updated GoDaddy DNS!"
