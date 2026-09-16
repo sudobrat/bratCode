@@ -20,6 +20,44 @@ app.use(express.json());
 
 const fileServiceUrl = env.FILE_SERVICE || "http://localhost:8003";
 
+// Catch-all for requests that bypass the /preview/ prefix (e.g. absolute paths from Vite like /src/main.jsx)
+app.use((req, res, next) => {
+    if (req.path.startsWith("/preview/")) {
+        return next();
+    }
+    const referer = req.get("referer");
+    if (!referer) {
+        return next();
+    }
+    
+    const match = referer.match(/\/preview\/([a-zA-Z0-9_-]+)\/(\d+)/);
+    if (match) {
+        const projectId = match[1];
+        const port = match[2];
+        const target = `http://ide-svc-${projectId}.default.svc.cluster.local:${port}`;
+
+        return createProxyMiddleware({
+            target,
+            changeOrigin: true,
+            ws: true,
+            on: {
+                proxyReq: (proxyReq: any, req: any, res: any) => {
+                    proxyReq.setHeader("Host", "localhost");
+                },
+                error: (err: any, req: any, res: any) => {
+                    log(`Proxy referer error for ${projectId}:${port} - ${err.message}`);
+                    if (!res.headersSent) {
+                        res.writeHead(502);
+                        res.end(`Bad Gateway: Could not connect to dev server on port ${port}. Is it running?`);
+                    }
+                }
+            },
+        })(req, res, next);
+    }
+    
+    next();
+});
+
 // Setup Reverse Proxy for Preview URLs
 // This routes requests like /preview/projectId/5173 to the Kubernetes Service
 app.use(
