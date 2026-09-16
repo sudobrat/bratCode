@@ -20,12 +20,95 @@ app.use(express.json());
 
 const fileServiceUrl = env.FILE_SERVICE || "http://localhost:8003";
 
-// Catch-all for requests that bypass the /preview/ prefix (e.g. absolute paths from Vite like /src/main.jsx or /node_modules/...)
-app.use((req, res, next) => {
-    if (req.path.startsWith("/preview/")) {
-        return next();
+// Shared logic to resolve target from request
+const resolveTarget = (req: any): { projectId: string; port: string } | null => {
+    let projectId, port;
+
+    // 1. Check if it's the main route
+    const previewMatch = req.url?.match(/^\/preview\/([a-zA-Z0-9_-]+)\/(\d+)/);
+    if (previewMatch) {
+        projectId = previewMatch[1];
+        port = previewMatch[2];
     }
-    
+
+    // 2. Otherwise check referer
+    if (!projectId) {
+        const referer = req.headers?.referer;
+        if (referer) {
+            const refererMatch = referer.match(/\/preview\/([a-zA-Z0-9_-]+)\/(\d+)/);
+            if (refererMatch) {
+                projectId = refererMatch[1];
+                port = refererMatch[2];
+            }
+        }
+    }
+
+    // 3. Otherwise check cookie
+    if (!projectId && req.headers?.cookie) {
+        const cookieMatch = req.headers.cookie.match(/active_preview=([a-zA-Z0-9_-]+)%3A(\d+)/) || req.headers.cookie.match(/active_preview=([a-zA-Z0-9_-]+):(\d+)/);
+        if (cookieMatch) {
+            projectId = cookieMatch[1];
+            port = cookieMatch[2];
+        }
+    }
+
+    if (projectId && port) {
+        return { projectId, port };
+    }
+    return null;
+};
+
+// Create a single global proxy instance for all Vite requests
+const viteProxy = createProxyMiddleware({
+    router: (req) => {
+        const targetInfo = resolveTarget(req);
+        if (targetInfo) {
+            // Store the port on the request so we can use it in proxyReq later
+            (req as any).targetPort = targetInfo.port;
+            return `http://ide-svc-${targetInfo.projectId}.default.svc.cluster.local:${targetInfo.port}`;
+        }
+        return undefined; // Do not proxy
+    },
+    changeOrigin: true,
+    ws: true,
+    pathRewrite: (path, req) => {
+        // Strip the /preview/projectId/port prefix if it exists
+        const match = path.match(/^\/preview\/([a-zA-Z0-9_-]+)\/(\d+)(.*)/);
+        if (match) {
+            return match[3] || "/";
+        }
+        return path;
+    },
+    on: {
+        proxyReq: (proxyReq: any, req: any, res: any) => {
+            const port = (req as any).targetPort;
+            if (port) {
+                proxyReq.setHeader("Host", "localhost");
+                proxyReq.setHeader("Referer", `http://localhost:${port}/`);
+                proxyReq.setHeader("Origin", `http://localhost:${port}`);
+            }
+        },
+        proxyReqWs: (proxyReq: any, req: any, socket: any, options: any, head: any) => {
+            const port = (req as any).targetPort;
+            if (port) {
+                proxyReq.setHeader("Host", "localhost");
+                proxyReq.setHeader("Origin", `http://localhost:${port}`);
+            }
+        },
+        error: (err: any, req: any, res: any) => {
+            const targetInfo = resolveTarget(req);
+            const port = targetInfo?.port || "unknown";
+            log(`Proxy error for ${targetInfo?.projectId || 'unknown'}:${port} - ${err.message}`);
+            if (res && !res.headersSent) {
+                res.writeHead(502);
+                res.end(`Bad Gateway: Could not connect to dev server on port ${port}. Is it running?`);
+            }
+        }
+    },
+});
+
+// Middleware to set cookie and conditionally proxy HTTP requests
+app.use((req, res, next) => {
     // Never proxy terminal-service infrastructure
     if (
         req.path.startsWith("/socket.io") ||
@@ -33,91 +116,20 @@ app.use((req, res, next) => {
     ) {
         return next();
     }
-    
-    let projectId, port;
-    
-    const referer = req.get("referer");
-    if (referer) {
-        const match = referer.match(/\/preview\/([a-zA-Z0-9_-]+)\/(\d+)/);
-        if (match) {
-            projectId = match[1];
-            port = match[2];
-        }
-    }
-    
-    if (!projectId && req.headers.cookie) {
-        const match = req.headers.cookie.match(/active_preview=([a-zA-Z0-9_-]+)%3A(\d+)/) || req.headers.cookie.match(/active_preview=([a-zA-Z0-9_-]+):(\d+)/);
-        if (match) {
-            projectId = match[1];
-            port = match[2];
-        }
-    }
-    
-    if (projectId && port) {
-        const target = `http://ide-svc-${projectId}.default.svc.cluster.local:${port}`;
 
-        return createProxyMiddleware({
-            target,
-            changeOrigin: true,
-            ws: true,
-            on: {
-                proxyReq: (proxyReq: any, req: any, res: any) => {
-                    proxyReq.setHeader("Host", "localhost");
-                    proxyReq.setHeader("Referer", `http://localhost:${port}/`);
-                    proxyReq.setHeader("Origin", `http://localhost:${port}`);
-                },
-                error: (err: any, req: any, res: any) => {
-                    log(`Proxy stray error for ${projectId}:${port} - ${err.message}`);
-                    if (!res.headersSent) {
-                        res.writeHead(502);
-                        res.end(`Bad Gateway: Could not connect to dev server on port ${port}. Is it running?`);
-                    }
-                }
-            },
-        })(req, res, next);
+    // Set cookie if it's the main route
+    const match = req.url?.match(/^\/preview\/([a-zA-Z0-9_-]+)\/(\d+)/);
+    if (match) {
+        res.cookie("active_preview", `${match[1]}:${match[2]}`, { path: "/" });
+    }
+
+    const targetInfo = resolveTarget(req);
+    if (targetInfo) {
+        return viteProxy(req, res, next);
     }
     
     next();
 });
-
-// Setup Reverse Proxy for Preview URLs
-// This routes requests like /preview/projectId/5173 to the Kubernetes Service
-app.use(
-    "/preview/:projectId/:port",
-    (req, res, next) => {
-        const { projectId, port } = req.params;
-        // Set a cookie so stray asset requests know where to go
-        res.cookie("active_preview", `${projectId}:${port}`, { path: "/" });
-        
-        // In Kubernetes, services are accessible via internal DNS: <service>.<namespace>.svc.cluster.local
-        const target = `http://ide-svc-${projectId}.default.svc.cluster.local:${port}`;
-
-        createProxyMiddleware({
-            target,
-            changeOrigin: true,
-            ws: true, // Needed for Vite HMR (Hot Module Replacement)
-            pathRewrite: (path) => {
-                // Strip the /preview/projectId/port prefix so the dev server sees requests starting at /
-                return path.replace(`/preview/${projectId}/${port}`, "");
-            },
-            on: {
-                proxyReq: (proxyReq: any, req: any, res: any) => {
-                    // Trick Vite's strict host checking into thinking the request is coming from localhost
-                    proxyReq.setHeader("Host", "localhost");
-                    proxyReq.setHeader("Referer", `http://localhost:${port}/`);
-                    proxyReq.setHeader("Origin", `http://localhost:${port}`);
-                },
-                error: (err: any, req: any, res: any) => {
-                    log(`Proxy error for ${projectId}:${port} - ${err.message}`);
-                    if (!res.headersSent) {
-                        res.writeHead(502);
-                        res.end(`Bad Gateway: Could not connect to dev server on port ${port}. Is it running?`);
-                    }
-                }
-            },
-        })(req, res, next);
-    }
-);
 
 // We keep this just in case we need temporary workspace storage, but
 // with PVCs we might not need it locally. For now, keep it for backwards compatibility if needed.
@@ -354,6 +366,21 @@ app.get("/health", (req: express.Request, res: express.Response) => {
         success: true,
         service: "terminal",
     });
+});
+
+// Explicitly handle WebSocket upgrades for Vite HMR
+server.on("upgrade", (req: any, socket: any, head: any) => {
+    // Let socket.io handle its own upgrades
+    if (req.url?.startsWith("/socket.io")) {
+        return;
+    }
+    
+    const targetInfo = resolveTarget(req);
+    if (targetInfo && (viteProxy as any).upgrade) {
+        (viteProxy as any).upgrade(req, socket, head);
+    } else {
+        socket.destroy();
+    }
 });
 
 server.listen(port, () => {
