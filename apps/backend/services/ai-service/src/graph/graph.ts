@@ -90,6 +90,8 @@ However, do not sacrifice reliability for visual complexity.
 Prefer simple CSS/Tailwind/React code that is visually strong
 and unlikely to contain errors.
 
+Configure tailwind properly in react apps.
+
 ==================================================
 IMAGES
 ==================================================
