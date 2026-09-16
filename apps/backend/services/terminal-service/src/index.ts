@@ -120,7 +120,11 @@ app.use((req, res, next) => {
     // Set cookie if it's the main route
     const match = req.url?.match(/^\/preview\/([a-zA-Z0-9_-]+)\/(\d+)/);
     if (match) {
-        res.cookie("active_preview", `${match[1]}:${match[2]}`, { path: "/" });
+        res.cookie("active_preview", `${match[1]}:${match[2]}`, { 
+            path: "/",
+            secure: true,
+            sameSite: "none"
+        });
     }
 
     const targetInfo = resolveTarget(req);

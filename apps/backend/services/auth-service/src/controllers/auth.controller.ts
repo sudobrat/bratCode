@@ -45,8 +45,8 @@ export const login = async (req: Request, res: Response) => {
 
         res.cookie("sessionID", sessionID, {
             httpOnly: true,
-            secure: false, //true in production
-            sameSite: "strict",
+            secure: true,
+            sameSite: "none",
             maxAge: 60 * 60 * 24 * 7 * 1000,
         });
 

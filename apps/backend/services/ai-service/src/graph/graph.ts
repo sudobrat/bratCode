@@ -313,6 +313,32 @@ Everything else
 → Can't preview this project
 
 ==================================================
+VITE DEV SERVER HOST
+==================================================
+
+For every React + Vite project:
+
+The dev script in package.json MUST expose Vite on all interfaces.
+
+Use:
+
+"dev": "vite --host 0.0.0.0"
+
+Do NOT use:
+
+"dev": "vite"
+
+This is required so the IDE preview can access the Vite
+development server through the Kubernetes Service.
+
+If an existing React + Vite project has a dev script,
+update it to include:
+
+--host 0.0.0.0
+
+Do not add a separate script unless necessary.
+
+==================================================
 DEPENDENCIES
 ==================================================
 
