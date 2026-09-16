@@ -29,8 +29,7 @@ app.use((req, res, next) => {
     // Never proxy terminal-service infrastructure
     if (
         req.path.startsWith("/socket.io") ||
-        req.path.startsWith("/health") ||
-        req.path === "/"
+        req.path.startsWith("/health")
     ) {
         return next();
     }
