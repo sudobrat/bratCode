@@ -171,6 +171,20 @@ jobs:
                   # Force Kubernetes to pull the new :latest images!
                   kubectl get deployments -o name | xargs -r kubectl rollout restart
 
+            - name: Install Cert-Manager
+              run: |
+                  helm repo add jetstack https://charts.jetstack.io
+                  helm repo update
+                  helm upgrade --install cert-manager jetstack/cert-manager \
+                    --namespace cert-manager \
+                    --create-namespace \
+                    --set installCRDs=true \
+                    --wait
+
+            - name: Apply Cluster Issuer
+              run: |
+                  kubectl apply -f k8s/cluster-issuer.yaml
+
             - name: Install Nginx Ingress Controller
               run: |
                   helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
