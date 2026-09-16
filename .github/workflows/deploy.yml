@@ -118,9 +118,9 @@ jobs:
             - name: Build & Push Frontend
               run: |
                   docker build -f Dockerfile.frontend \
-                    --build-arg VITE_SERVER_URL="http://api.bratcode.bharatrajsingal.online" \
+                    --build-arg VITE_SERVER_URL="https://api.bratcode.bharatrajsingal.online" \
                     --build-arg VITE_FIREBASE_API_KEY="${{ secrets.VITE_FIREBASE_API_KEY }}" \
-                    --build-arg VITE_TERMINAL_SERVICE_URL="http://terminal.bratcode.bharatrajsingal.online" \
+                    --build-arg VITE_TERMINAL_SERVICE_URL="https://terminal.bratcode.bharatrajsingal.online" \
                     -t ${{ needs.terraform.outputs.acr_login_server }}/frontend-app:latest .
                   docker push ${{ needs.terraform.outputs.acr_login_server }}/frontend-app:latest
 
@@ -145,7 +145,7 @@ jobs:
             - name: Create Application Secrets
               run: |
                   kubectl create secret generic app-secrets \
-                    --from-literal=FRONTEND_URL="http://bratcode.bharatrajsingal.online" \
+                    --from-literal=FRONTEND_URL="https://bratcode.bharatrajsingal.online" \
                     --from-literal=AUTH_SERVICE="http://auth-service:8001" \
                     --from-literal=PROJECT_SERVICE="http://project-service:8002" \
                     --from-literal=FILE_SERVICE="http://file-service:8003" \
