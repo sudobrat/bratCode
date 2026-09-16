@@ -191,6 +191,12 @@ jobs:
                   echo "Public IP is: $IP"
                   echo "public_ip=$IP" >> $GITHUB_OUTPUT
 
+                  # Wait for NGINX Ingress Controller to be ready
+                  kubectl wait --namespace ingress-basic \
+                    --for=condition=ready pod \
+                    --selector=app.kubernetes.io/component=controller \
+                    --timeout=120s
+
                   # Now apply the ingress rules so it routes traffic!
                   kubectl apply -f k8s/ingress.yaml
 

@@ -11,10 +11,10 @@ metadata:
     name: bratcode-ingress
     annotations:
         # This assumes we will install the popular Nginx Ingress Controller
-        kubernetes.io/ingress.class: "nginx"
         cert-manager.io/cluster-issuer: "letsencrypt-prod"
         nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
+    ingressClassName: "nginx"
     tls:
         - hosts:
             - bratcode.bharatrajsingal.online
