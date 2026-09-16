@@ -20,20 +20,41 @@ app.use(express.json());
 
 const fileServiceUrl = env.FILE_SERVICE || "http://localhost:8003";
 
-// Catch-all for requests that bypass the /preview/ prefix (e.g. absolute paths from Vite like /src/main.jsx)
+// Catch-all for requests that bypass the /preview/ prefix (e.g. absolute paths from Vite like /src/main.jsx or /node_modules/...)
 app.use((req, res, next) => {
     if (req.path.startsWith("/preview/")) {
         return next();
     }
-    const referer = req.get("referer");
-    if (!referer) {
+    
+    // Never proxy terminal-service infrastructure
+    if (
+        req.path.startsWith("/socket.io") ||
+        req.path.startsWith("/health") ||
+        req.path === "/"
+    ) {
         return next();
     }
     
-    const match = referer.match(/\/preview\/([a-zA-Z0-9_-]+)\/(\d+)/);
-    if (match) {
-        const projectId = match[1];
-        const port = match[2];
+    let projectId, port;
+    
+    const referer = req.get("referer");
+    if (referer) {
+        const match = referer.match(/\/preview\/([a-zA-Z0-9_-]+)\/(\d+)/);
+        if (match) {
+            projectId = match[1];
+            port = match[2];
+        }
+    }
+    
+    if (!projectId && req.headers.cookie) {
+        const match = req.headers.cookie.match(/active_preview=([a-zA-Z0-9_-]+)%3A(\d+)/) || req.headers.cookie.match(/active_preview=([a-zA-Z0-9_-]+):(\d+)/);
+        if (match) {
+            projectId = match[1];
+            port = match[2];
+        }
+    }
+    
+    if (projectId && port) {
         const target = `http://ide-svc-${projectId}.default.svc.cluster.local:${port}`;
 
         return createProxyMiddleware({
@@ -43,9 +64,11 @@ app.use((req, res, next) => {
             on: {
                 proxyReq: (proxyReq: any, req: any, res: any) => {
                     proxyReq.setHeader("Host", "localhost");
+                    proxyReq.setHeader("Referer", `http://localhost:${port}/`);
+                    proxyReq.setHeader("Origin", `http://localhost:${port}`);
                 },
                 error: (err: any, req: any, res: any) => {
-                    log(`Proxy referer error for ${projectId}:${port} - ${err.message}`);
+                    log(`Proxy stray error for ${projectId}:${port} - ${err.message}`);
                     if (!res.headersSent) {
                         res.writeHead(502);
                         res.end(`Bad Gateway: Could not connect to dev server on port ${port}. Is it running?`);
@@ -64,6 +87,9 @@ app.use(
     "/preview/:projectId/:port",
     (req, res, next) => {
         const { projectId, port } = req.params;
+        // Set a cookie so stray asset requests know where to go
+        res.cookie("active_preview", `${projectId}:${port}`, { path: "/" });
+        
         // In Kubernetes, services are accessible via internal DNS: <service>.<namespace>.svc.cluster.local
         const target = `http://ide-svc-${projectId}.default.svc.cluster.local:${port}`;
 
@@ -79,6 +105,8 @@ app.use(
                 proxyReq: (proxyReq: any, req: any, res: any) => {
                     // Trick Vite's strict host checking into thinking the request is coming from localhost
                     proxyReq.setHeader("Host", "localhost");
+                    proxyReq.setHeader("Referer", `http://localhost:${port}/`);
+                    proxyReq.setHeader("Origin", `http://localhost:${port}`);
                 },
                 error: (err: any, req: any, res: any) => {
                     log(`Proxy error for ${projectId}:${port} - ${err.message}`);
